@@ -8,23 +8,23 @@ pragma solidity 0.8.30;
 contract DoctorRegistry is AccessControl {
     using SafeERC20 for IERC20;
 
-    mapping(uint32 => RegStruct) ApprovedRegistry;
-    mapping(uint256 => RegStruct) PendingRegistry;
-
     struct RegStruct {
         string Name;
         string specilization;
         address paymentWallet;
-        uint256 consultationFee;
+        uint256 consultationFeePerHour;
     }
 
-    uint256 depositFee;
-    uint32 doctorID;
+    mapping(uint32 => RegStruct) ApprovedRegistry;
+    mapping(uint256 => RegStruct) PendingRegistry;
 
+    uint256 public depositFee;
+    uint32 doctorID;
     bytes32 public constant APPROVER = keccak256("APPROVER");
 
     event DoctorRegistered(uint32 docID);
     event PendingRegistration(uint32 docID);
+
     event DoctorApproved(uint32 docID);
     event DoctorDenied(uint32 docID);
 
@@ -39,6 +39,8 @@ contract DoctorRegistry is AccessControl {
     }
 
     function approveDoctor(uint32 _docID) public onlyRole(APPROVER) {
+        RegStruct memory Docreg = getDoctor(_docID);
+        ApprovedRegistry[_docID] = Docreg;
         emit DoctorApproved(doctorID);
     }
 
@@ -52,5 +54,9 @@ contract DoctorRegistry is AccessControl {
 
     function getDoctor(uint32 _docID) public view returns (RegStruct memory DS) {
         return ApprovedRegistry[_docID];
+    }
+
+    function getPendingDoctor(uint32 _docID) public view returns (RegStruct memory DS) {
+        return PendingRegistry[_docID];
     }
 }

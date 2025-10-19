@@ -21,8 +21,10 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
     IDoctorRegistry public immutable doctorRegistry;
     IPythPriceConsumer public immutable pythOracle;
     IERC20 public immutable pyusd;
+    IERC20 public immutable usdc;
+    IERC20 public immutable usdt;
 
-    uint256 public numSessions;
+    uint32 public numSessions;
     mapping(uint256 => Structs.Session) public sessions;
     mapping(address => uint256[]) public patientSessions;
     mapping(uint256 => uint256[]) public doctorSessions;
@@ -37,15 +39,16 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
     constructor(
         address _doctorRegistry,
         address _pythOracle,
-        address _pyusd
+        address _pyusd,
+        address _usdc,
+        address _usdt
     ) {
-        require(_doctorRegistry != address(0), "Invalid doctor registry");
-        require(_pythOracle != address(0), "Invalid oracle");
-        require(_pyusd != address(0), "Invalid pyUSD");
 
         doctorRegistry = IDoctorRegistry(_doctorRegistry);
         pythOracle = IPythPriceConsumer(_pythOracle);
         pyusd = IERC20(_pyusd);
+        usdc = IERC20(_usdc);
+        usdt = IERC20(_usdt);
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(ADMIN_ROLE, msg.sender);
@@ -54,14 +57,15 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
     /**
      * @notice Create and pay for a consultation session in one transaction
      * @param doctorId The ID of the doctor in the registry
-     * @param consultationFee Amount the patient is sending for payment
+     * @param consultationPayment Amount the patient is sending for payment
      * @param priceUpdateData Pyth price update data from off-chain API
      *
      */
     function createSession(
         uint32 doctorId,
-        uint256 consultationFee,
-        bytes[] calldata priceUpdateData
+        uint256 consultationPayment,
+        bytes[] calldata priceUpdateData,
+        address tokenAddress
     ) external payable {
         Structs.RegStruct memory doctor = doctorRegistry.getDoctor(doctorId);
         require(doctor.paymentWallet != address(0), "Doctor not found");
@@ -69,33 +73,71 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
         uint256 updateFee = pythOracle.getUpdateFee(priceUpdateData);
         require(address(this).balance >= updateFee, "Insufficient contract ETH for oracle fee");
 
-        uint256 usdValue = pythOracle.getEthToUsd{value: updateFee}(
-            consultationFee,
-            priceUpdateData
-        );
-
         uint256 pyusdNeeded = (doctor.consultationFeePerHour * 1e6) / 100;
 
-        // Check if USD value from patient's ETH is sufficient
-        require(usdValue >= pyusdNeeded, "Insufficient USD value from ETH");
+        // check if msg.value > 0, then use oracle, else
+        uint256 pyusdValue;
+        IERC20 paymentMethod;
+
+        if (msg.value > 0) {
+            require(consultationPayment == msg.value, "ETH amount mismatch");
+
+            pyusdValue = pythOracle.getEthToPyusd{value: updateFee}(
+                consultationPayment,
+                priceUpdateData
+            );
+
+        } else if (tokenAddress == address(usdc)) {
+            pyusdValue = pythOracle.getUsdcToPyusd{value: updateFee}(
+                consultationPayment,
+                priceUpdateData
+            );
+            paymentMethod = usdc;
+
+        } else if (tokenAddress == address(usdt)) {
+            pyusdValue = pythOracle.getUsdtToPyusd{value: updateFee}(
+                consultationPayment,
+                priceUpdateData
+            );
+            paymentMethod = usdt;
+
+        } else {
+            revert("Invalid payment");
+        }
+
+        // Check if converted value is sufficient
+        require(pyusdValue >= pyusdNeeded, "Insufficient payment value");
 
         require(pyUSDReserveBalance >= pyusdNeeded, "Insufficient pyUSD reserve");
 
         pyUSDReserveBalance -= pyusdNeeded;
 
-        uint256 sessionId = ++numSessions;
+        uint32 sessionId = ++numSessions;
 
         sessions[sessionId] = Structs.Session({
-            sessionId: sessionId,
+            status: uint8(SessionStatus.Active),
             doctorId: doctorId,
+            sessionId: sessionId,
             patient: msg.sender,
             pyusdAmount: pyusdNeeded,
-            status: uint8(SessionStatus.Active),
             createdAt: block.timestamp
         });
 
         patientSessions[msg.sender].push(sessionId);
         doctorSessions[doctorId].push(sessionId);
+
+        // Transfer payment tokens from patient to contract
+        if (address(paymentMethod) == address(0)) {
+            uint256 ethNeeded = (pyusdNeeded * consultationPayment) / pyusdValue;
+            uint256 excessEth = consultationPayment - ethNeeded;
+
+            if (excessEth > 0) {
+                payable(msg.sender).transfer(excessEth);
+            }
+
+        } else {
+            paymentMethod.safeTransferFrom(msg.sender, address(this), consultationPayment);
+        }
 
         emit SessionCreated(sessionId, doctorId, msg.sender, doctor.consultationFeePerHour, pyusdNeeded);
     }

@@ -8,14 +8,15 @@ library Structs {
         string specilization;
         address paymentWallet;
         uint256 consultationFeePerHour;
+        uint256 depositFeeStored;
     }
 
     struct Session {
-        uint256 sessionId;
+        uint8 status;
         uint32 doctorId;
+        uint32 sessionId;
         address patient;
         uint256 pyusdAmount;         
-        uint8 status;
         uint256 createdAt;
     }
 } 

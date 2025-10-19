@@ -15,6 +15,7 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
 
     address public depositToken;
     uint256 public depositFee;
+    uint256 public stakeAmount;
     uint32 doctorID;
     bytes32 public constant APPROVER = keccak256("APPROVER");
 
@@ -42,7 +43,7 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
         regStruct.depositFeeStored = depositFee;
         PendingRegistry[doctorID] = regStruct;
 
-        IERC20(depositToken).transferFrom(msg.sender, address(this), depositFee);
+        IERC20(depositToken).transferFrom(msg.sender, address(this), stakeAmount);
         emit PendingRegistration(doctorID);
     }
 
@@ -53,7 +54,7 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
     function approveDoctor(uint32 _docID) public onlyRole(APPROVER) {
         Structs.RegStruct memory Docreg = getPendingDoctor(_docID);
         ApprovedRegistry[_docID] = Docreg;
-        IERC20(depositToken).transfer(Docreg.paymentWallet, Docreg.depositFeeStored);
+        IERC20(depositToken).transfer(Docreg.paymentWallet, stakeAmount - Docreg.depositFeeStored);
         emit DoctorApproved(doctorID);
     }
 

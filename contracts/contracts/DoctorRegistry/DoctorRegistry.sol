@@ -17,9 +17,6 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
     uint32 doctorID;
     bytes32 public constant APPROVER = keccak256("APPROVER");
 
-    mapping(uint32 => RegStruct) ApprovedRegistry;
-    mapping(uint256 => RegStruct) PendingRegistry;
-
     event PendingRegistration(uint32 docID);
     event DepositFeeChanged(uint256 newFee);
     event DoctorRegistered(uint32 docID);

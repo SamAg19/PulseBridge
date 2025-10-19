@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {DoctorRegistry} from "../../contracts/DoctorRegistry/DoctorRegistry.sol";
+import {Structs} from "../../contracts/Structs.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract CounterTest is Test {
@@ -16,7 +17,7 @@ contract CounterTest is Test {
     }
 
     function test_DoctorRegisters() public {
-        DoctorRegistry.RegStruct memory Reg = DoctorRegistry.RegStruct("Plairfx", "Mental-Health-Therapy", alice, 1e6);
+        Structs.RegStruct memory Reg = Structs.RegStruct("Plairfx", "Mental-Health-Therapy", alice, 1e6);
         DocReg.registerAsDoctor(Reg);
 
         assertEq(keccak256(abi.encode(Reg)), keccak256(abi.encode(DocReg.getPendingDoctor(1))));
@@ -25,7 +26,7 @@ contract CounterTest is Test {
     function test_ApproveDoctor() public {
         vm.startPrank(alice);
 
-        DoctorRegistry.RegStruct memory Reg = DoctorRegistry.RegStruct("Plairfx", "Mental-Health-Therapy", alice, 1e6);
+        Structs.RegStruct memory Reg = Structs.RegStruct("Plairfx", "Mental-Health-Therapy", alice, 1e6);
         DocReg.registerAsDoctor(Reg);
 
         vm.expectRevert();

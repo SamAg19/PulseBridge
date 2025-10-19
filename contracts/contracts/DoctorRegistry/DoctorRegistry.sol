@@ -2,21 +2,16 @@
 
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IDoctorRegistry} from "./IDoctorRegistry.sol";
+import {Structs} from "./../Structs.sol";
 
 pragma solidity 0.8.30;
 
-contract DoctorRegistry is AccessControl {
+contract DoctorRegistry is AccessControl, IDoctorRegistry {
     using SafeERC20 for IERC20;
 
-    struct RegStruct {
-        string Name;
-        string specilization;
-        address paymentWallet;
-        uint256 consultationFeePerHour;
-    }
-
-    mapping(uint32 => RegStruct) ApprovedRegistry;
-    mapping(uint256 => RegStruct) PendingRegistry;
+    mapping(uint32 => Structs.RegStruct) ApprovedRegistry;
+    mapping(uint256 => Structs.RegStruct) PendingRegistry;
 
     uint256 public depositFee;
     uint32 doctorID;
@@ -32,14 +27,14 @@ contract DoctorRegistry is AccessControl {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
-    function registerAsDoctor(RegStruct memory regStruct) public {
+    function registerAsDoctor(Structs.RegStruct memory regStruct) public {
         doctorID++;
         PendingRegistry[doctorID] = regStruct;
         emit PendingRegistration(doctorID);
     }
 
     function approveDoctor(uint32 _docID) public onlyRole(APPROVER) {
-        RegStruct memory Docreg = getDoctor(_docID);
+        Structs.RegStruct memory Docreg = getDoctor(_docID);
         ApprovedRegistry[_docID] = Docreg;
         emit DoctorApproved(doctorID);
     }
@@ -52,11 +47,11 @@ contract DoctorRegistry is AccessControl {
         depositFee = _newDepositFee;
     }
 
-    function getDoctor(uint32 _docID) public view returns (RegStruct memory DS) {
+    function getDoctor(uint32 _docID) public view returns (Structs.RegStruct memory DS) {
         return ApprovedRegistry[_docID];
     }
 
-    function getPendingDoctor(uint32 _docID) public view returns (RegStruct memory DS) {
+    function getPendingDoctor(uint32 _docID) public view returns (Structs.RegStruct memory DS) {
         return PendingRegistry[_docID];
     }
 }

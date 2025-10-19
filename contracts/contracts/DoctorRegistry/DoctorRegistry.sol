@@ -17,34 +17,41 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
     uint32 doctorID;
     bytes32 public constant APPROVER = keccak256("APPROVER");
 
-    event DoctorRegistered(uint32 docID);
-    event PendingRegistration(uint32 docID);
+    mapping(uint32 => RegStruct) ApprovedRegistry;
+    mapping(uint256 => RegStruct) PendingRegistry;
 
+    event PendingRegistration(uint32 docID);
+    event DepositFeeChanged(uint256 newFee);
+    event DoctorRegistered(uint32 docID);
     event DoctorApproved(uint32 docID);
     event DoctorDenied(uint32 docID);
 
-    constructor() {
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    constructor(address _owner, uint256 _depositFee) {
+        _grantRole(DEFAULT_ADMIN_ROLE, _owner);
+        depositFee = _depositFee;
     }
 
     function registerAsDoctor(Structs.RegStruct memory regStruct) public {
+        // Needs to pay a depositFee.. or., lock their deposit from the depositContract.
         doctorID++;
         PendingRegistry[doctorID] = regStruct;
         emit PendingRegistration(doctorID);
     }
 
     function approveDoctor(uint32 _docID) public onlyRole(APPROVER) {
-        Structs.RegStruct memory Docreg = getDoctor(_docID);
+        Structs.RegStruct memory Docreg = getPendingDoctor(_docID);
         ApprovedRegistry[_docID] = Docreg;
         emit DoctorApproved(doctorID);
     }
 
-    function declineDoctor(uint32 _docID) public onlyRole(APPROVER) {
+    function denyDoctor(uint32 _docID) public onlyRole(APPROVER) {
         delete PendingRegistry[_docID];
+        emit DoctorDenied(_docID);
     }
 
     function changeDepositFee(uint256 _newDepositFee) public onlyRole(DEFAULT_ADMIN_ROLE) {
         depositFee = _newDepositFee;
+        emit DepositFeeChanged(_newDepositFee);
     }
 
     function getDoctor(uint32 _docID) public view returns (Structs.RegStruct memory DS) {

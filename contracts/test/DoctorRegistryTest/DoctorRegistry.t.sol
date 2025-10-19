@@ -39,7 +39,7 @@ contract CounterTest is Test {
     function test_ApproverCanApprovePendingRequest() public {
         vm.startPrank(alice);
 
-        DoctorRegistry.RegStruct memory Reg = DoctorRegistry.RegStruct("Plairfx", "Mental-Health-Therapy", alice, 1e6);
+        Structs.RegStruct memory Reg = Structs.RegStruct("Plairfx", "Mental-Health-Therapy", alice, 1e6);
         DocReg.registerAsDoctor(Reg);
 
         vm.startPrank(approver);
@@ -52,7 +52,7 @@ contract CounterTest is Test {
     function test_ApproverCanDenyPendingRequest() public {
         vm.startPrank(alice);
 
-        DoctorRegistry.RegStruct memory Reg = DoctorRegistry.RegStruct("Plairfx", "Mental-Health-Therapy", alice, 1e6);
+        Structs.RegStruct memory Reg = Structs.RegStruct("Plairfx", "Mental-Health-Therapy", alice, 1e6);
         DocReg.registerAsDoctor(Reg);
 
         vm.expectRevert();

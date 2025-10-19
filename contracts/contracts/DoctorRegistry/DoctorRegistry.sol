@@ -13,6 +13,7 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
     mapping(uint32 => Structs.RegStruct) ApprovedRegistry;
     mapping(uint256 => Structs.RegStruct) PendingRegistry;
 
+    address public depositToken;
     uint256 public depositFee;
     uint32 doctorID;
     bytes32 public constant APPROVER = keccak256("APPROVER");
@@ -23,15 +24,16 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
     event DoctorApproved(uint32 docID);
     event DoctorDenied(uint32 docID);
 
-    constructor(address _owner, uint256 _depositFee) {
+    constructor(address _owner, uint256 _depositFee, address _depositToken) {
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
         depositFee = _depositFee;
+        depositToken = _depositToken;
     }
 
     function registerAsDoctor(Structs.RegStruct memory regStruct) public {
-        // Needs to pay a depositFee.. or., lock their deposit from the depositContract.
         doctorID++;
         PendingRegistry[doctorID] = regStruct;
+        IERC20(depositToken).transferFrom(msg.sender, address(this), depositFee);
         emit PendingRegistration(doctorID);
     }
 
@@ -44,6 +46,10 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
     function denyDoctor(uint32 _docID) public onlyRole(APPROVER) {
         delete PendingRegistry[_docID];
         emit DoctorDenied(_docID);
+    }
+
+    function withdrawDepositFees() public onlyRole(DEFAULT_ADMIN_ROLE) {
+        IERC20(depositToken).transfer(msg.sender, IERC20(depositToken).balanceOf(address(this)));
     }
 
     function changeDepositFee(uint256 _newDepositFee) public onlyRole(DEFAULT_ADMIN_ROLE) {

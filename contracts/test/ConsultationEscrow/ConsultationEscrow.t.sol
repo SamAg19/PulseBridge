@@ -7,6 +7,7 @@ import {Structs} from "../../contracts/Structs.sol";
 import {Test} from "forge-std/Test.sol";
 import {MockERC20} from "../../contracts/Mocks/MockERC20.sol";
 import {MockPyth} from "../../contracts/Mocks/MockPyth.sol";
+import {PythPriceConsumer} from "../../contracts/Oracle/PythPriceConsumer.sol";
 
 contract ConsultationEscrowTest is Test {
     DoctorRegistry DocReg;
@@ -15,34 +16,47 @@ contract ConsultationEscrowTest is Test {
     MockERC20 USDC;
     MockERC20 USDT;
     MockPyth Pyth;
+    PythPriceConsumer PythConsumer;
 
     address admin = makeAddr("admin");
     address doctor = makeAddr("doctor");
     address alice = makeAddr("alice");
 
     uint256 consultationFeePerHour = 50e6;
-    uint256 depositFee = 10e6;
+    uint256 depositFee = 1e6;
+    uint256 stakeAmount = 5e6;
 
     function setUp() public {
         vm.startPrank(admin);
         PYUSD = new MockERC20("PayPal USD", "pyUSD");
         USDC = new MockERC20("USD Coin", "USDC");
         USDT = new MockERC20("Tether USD", "USDT");
+
+        USDT.mint(alice, 50e6);
+        USDC.mint(alice, 50e6);
+
+        vm.deal(alice, 50 ether);
+
+        PYUSD.mint(admin, 100e6);
+
         Pyth = new MockPyth();
-        DocReg = new DoctorRegistry(admin, depositFee, address(PYUSD));
-        ConsultEscrow = new ConsultationEscrow(address(DocReg), address(Pyth), address(PYUSD), address(USDC), address(USDT));
+        PythConsumer = new PythPriceConsumer(address(Pyth));
+
+        DocReg = new DoctorRegistry(admin, depositFee, stakeAmount, address(PYUSD));
+        ConsultEscrow =
+            new ConsultationEscrow(address(DocReg), address(PythConsumer), address(PYUSD), address(USDC), address(USDT));
 
         vm.stopPrank();
     }
 
     modifier doctorCreatedAndApproved() {
-        vm.startPrank(alice);
+        vm.startPrank(doctor);
         PYUSD.faucet(10e6);
 
         Structs.RegStruct memory Reg =
-            Structs.RegStruct("Alice", "Mental-Health-Therapy", alice, consultationFeePerHour, 0);
+            Structs.RegStruct("Alice", "Mental-Health-Therapy", doctor, consultationFeePerHour, 0, 0);
 
-        PYUSD.approve(address(DocReg), depositFee);
+        PYUSD.approve(address(DocReg), stakeAmount);
         DocReg.registerAsDoctor(Reg);
 
         vm.startPrank(admin);
@@ -51,22 +65,73 @@ contract ConsultationEscrowTest is Test {
         _;
     }
 
-    function test_createSession() public doctorCreatedAndApproved {
-        // needs data..
+    function test_createSessionReverts() public doctorCreatedAndApproved {
         bytes[] memory barray = new bytes[](1);
         vm.startPrank(alice);
 
         vm.expectRevert("Doctor not found");
-        ConsultEscrow.createSession(2, consultationFeePerHour, barray);
+        ConsultEscrow.createSession(2, consultationFeePerHour, barray, address(PYUSD));
 
         vm.expectRevert("Insufficient contract ETH for oracle fee");
-        ConsultEscrow.createSession(1, consultationFeePerHour, barray);
+        ConsultEscrow.createSession(1, consultationFeePerHour, barray, address(PYUSD));
 
         vm.deal(address(ConsultEscrow), 1 ether);
 
-        //@info: getEthToUsd func does not exist,(reverts atm).
+        vm.expectRevert("Invalid payment");
+        ConsultEscrow.createSession(1, consultationFeePerHour, barray, address(PYUSD));
 
-        // vm.expectRevert("Insufficient USD value from ETH");
-        // ConsultEscrow.createSession(1, consultationFeePerHour, barray);
+        vm.expectRevert("Insufficient payment value");
+        ConsultEscrow.createSession(1, 1e6, barray, address(USDT));
+
+        vm.expectRevert("Insufficient pyUSD reserve");
+        ConsultEscrow.createSession(1, consultationFeePerHour, barray, address(USDT));
+
+        vm.startPrank(admin);
+        PYUSD.approve(address(ConsultEscrow), consultationFeePerHour);
+        ConsultEscrow.depositPyusdReserve(50e6);
+
+        vm.startPrank(alice);
+        USDT.approve(address(ConsultEscrow), consultationFeePerHour);
+        ConsultEscrow.createSession(1, consultationFeePerHour, barray, address(USDT));
+    }
+
+    function test_createSessionsAllCoins() public doctorCreatedAndApproved {
+        vm.deal(address(ConsultEscrow), 1 ether);
+        uint256 ConsultEscrowBalanceBefore = address(ConsultEscrow).balance;
+        vm.startPrank(admin);
+        PYUSD.approve(address(ConsultEscrow), consultationFeePerHour);
+        ConsultEscrow.depositPyusdReserve(50e6);
+
+        bytes[] memory barray = new bytes[](1);
+        vm.startPrank(alice);
+        USDT.approve(address(ConsultEscrow), consultationFeePerHour);
+        ConsultEscrow.createSession(1, consultationFeePerHour, barray, address(USDT));
+
+        assertEq(USDT.balanceOf(alice), 0);
+        assertEq(USDT.balanceOf(address(ConsultEscrow)), consultationFeePerHour);
+
+        // USDC
+        vm.startPrank(admin);
+        PYUSD.approve(address(ConsultEscrow), consultationFeePerHour);
+        ConsultEscrow.depositPyusdReserve(50e6);
+
+        vm.startPrank(alice);
+        USDC.approve(address(ConsultEscrow), consultationFeePerHour);
+        ConsultEscrow.createSession(1, consultationFeePerHour, barray, address(USDC));
+
+        assertEq(USDC.balanceOf(alice), 0);
+        assertEq(USDC.balanceOf(address(ConsultEscrow)), consultationFeePerHour);
+
+        // ETH @error, with consultationFeePerHour, fix this.
+        // vm.startPrank(admin);
+        // PYUSD.approve(address(ConsultEscrow), consultationFeePerHour);
+        // ConsultEscrow.depositPyusdReserve(50e6);
+
+        // vm.startPrank(alice);
+
+        // ConsultEscrow.createSession{value: 0.02 ether}(1, 0.02 ether, barray, address(USDC));
+
+        // assertEq(alice.balance, 0);
+        // assertEq(address(ConsultEscrow).balance, ConsultEscrowBalanceBefore + 0.02 ether);
     }
 }

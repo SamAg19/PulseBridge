@@ -9,6 +9,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {IDoctorRegistry} from "../DoctorRegistry/IDoctorRegistry.sol";
 import {IPythPriceConsumer} from "../Oracle/IPythPriceConsumer.sol";
 import {Structs} from "../Structs.sol";
+import "hardhat/console.sol";
 
 contract ConsultationEscrow is AccessControl, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -33,17 +34,12 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
-    event SessionCreated(uint256 indexed sessionId, uint32 indexed doctorId, address indexed patient, uint256 feeUSD, uint256 pyusdAmount);
+    event SessionCreated(
+        uint256 indexed sessionId, uint32 indexed doctorId, address indexed patient, uint256 feeUSD, uint256 pyusdAmount
+    );
     event PaymentReleased(uint256 indexed sessionId, address indexed doctor, uint256 amount);
 
-    constructor(
-        address _doctorRegistry,
-        address _pythOracle,
-        address _pyusd,
-        address _usdc,
-        address _usdt
-    ) {
-
+    constructor(address _doctorRegistry, address _pythOracle, address _pyusd, address _usdc, address _usdt) {
         doctorRegistry = IDoctorRegistry(_doctorRegistry);
         pythOracle = IPythPriceConsumer(_pythOracle);
         pyusd = IERC20(_pyusd);
@@ -73,39 +69,27 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
         uint256 updateFee = pythOracle.getUpdateFee(priceUpdateData);
         require(address(this).balance >= updateFee, "Insufficient contract ETH for oracle fee");
 
-        uint256 pyusdNeeded = (doctor.consultationFeePerHour * 1e6) / 100;
+        // uint256 pyusdNeeded = (doctor.consultationFeePerHour * 1e6) / 100;
+        uint256 pyusdNeeded = doctor.consultationFeePerHour;
 
         // check if msg.value > 0, then use oracle, else
         uint256 pyusdValue;
         IERC20 paymentMethod;
 
         if (msg.value > 0) {
-            require(consultationPayment == msg.value, "ETH amount mismatch");
-
-            pyusdValue = pythOracle.getEthToPyusd{value: updateFee}(
-                consultationPayment,
-                priceUpdateData
-            );
-
+            pyusdValue = pythOracle.getEthToPyusd{value: updateFee}(msg.value, priceUpdateData);
         } else if (tokenAddress == address(usdc)) {
-            pyusdValue = pythOracle.getUsdcToPyusd{value: updateFee}(
-                consultationPayment,
-                priceUpdateData
-            );
+            pyusdValue = pythOracle.getUsdcToPyusd{value: updateFee}(consultationPayment, priceUpdateData);
             paymentMethod = usdc;
-
         } else if (tokenAddress == address(usdt)) {
-            pyusdValue = pythOracle.getUsdtToPyusd{value: updateFee}(
-                consultationPayment,
-                priceUpdateData
-            );
+            pyusdValue = pythOracle.getUsdtToPyusd{value: updateFee}(consultationPayment, priceUpdateData);
             paymentMethod = usdt;
-
         } else {
             revert("Invalid payment");
         }
 
         // Check if converted value is sufficient
+
         require(pyusdValue >= pyusdNeeded, "Insufficient payment value");
 
         require(pyUSDReserveBalance >= pyusdNeeded, "Insufficient pyUSD reserve");
@@ -128,15 +112,11 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
 
         // Transfer payment tokens from patient to contract
         if (address(paymentMethod) == address(0)) {
-            uint256 ethNeeded = (pyusdNeeded * consultationPayment) / pyusdValue;
-            uint256 excessEth = consultationPayment - ethNeeded;
-
-            if (excessEth > 0) {
-                payable(msg.sender).transfer(excessEth);
+            if (pyusdValue > consultationPayment) {
+                pyusd.safeTransfer(msg.sender, (pyusdValue - consultationPayment));
             }
-
         } else {
-            paymentMethod.safeTransferFrom(msg.sender, address(this), consultationPayment);
+            IERC20(paymentMethod).safeTransferFrom(msg.sender, address(this), consultationPayment);
         }
 
         emit SessionCreated(sessionId, doctorId, msg.sender, doctor.consultationFeePerHour, pyusdNeeded);

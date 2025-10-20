@@ -15,11 +15,13 @@ contract DoctorRegistryTest is Test {
     address approver = makeAddr("approver");
 
     uint256 consultationFeePerHour = 50e6;
+    uint256 stakeAmount = 5e6;
+    uint256 depositFee = 1e6;
 
     function setUp() public {
         vm.startPrank(admin);
         PYUSD = new MockERC20("PayPal USD", "pyUSD");
-        DocReg = new DoctorRegistry(admin, 5e6, address(PYUSD));
+        DocReg = new DoctorRegistry(admin, depositFee, stakeAmount, address(PYUSD));
 
         // minting tokens..
         PYUSD.mint(alice, 55e6);
@@ -31,30 +33,31 @@ contract DoctorRegistryTest is Test {
     modifier registration() {
         uint256 currentDepositFee = DocReg.depositFee();
         Structs.RegStruct memory Reg =
-            Structs.RegStruct("Plairfx", "Mental-Health-Therapy", alice, consultationFeePerHour, 0);
+            Structs.RegStruct("Plairfx", "Mental-Health-Therapy", alice, consultationFeePerHour, 0, 0);
         vm.startPrank(alice);
-        PYUSD.approve(address(DocReg), currentDepositFee);
+        PYUSD.approve(address(DocReg), stakeAmount + depositFee);
         DocReg.registerAsDoctor(Reg);
         _;
     }
 
     function test_DoctorRegisters() public {
         uint256 currentStakeAmount = DocReg.stakeAmount();
+
         uint256 balanceBefore = PYUSD.balanceOf(alice);
         Structs.RegStruct memory Reg =
-            Structs.RegStruct("Plairfx", "Mental-Health-Therapy", address(0x0), consultationFeePerHour, 0);
+            Structs.RegStruct("Plairfx", "Mental-Health-Therapy", address(0x0), consultationFeePerHour, 0, 0);
 
         vm.startPrank(alice);
-        PYUSD.approve(address(DocReg), currentStakeAmount);
+        PYUSD.approve(address(DocReg), currentStakeAmount + depositFee);
         vm.expectRevert("Wallet cannot be a zero address!");
         DocReg.registerAsDoctor(Reg);
 
         Reg.paymentWallet = address(alice);
-
         DocReg.registerAsDoctor(Reg);
 
-        Structs.RegStruct memory ExpectedReturn =
-            Structs.RegStruct("Plairfx", "Mental-Health-Therapy", alice, consultationFeePerHour, currentStakeAmount);
+        Structs.RegStruct memory ExpectedReturn = Structs.RegStruct(
+            "Plairfx", "Mental-Health-Therapy", alice, consultationFeePerHour, stakeAmount, depositFee
+        );
 
         assertEq(keccak256(abi.encode(ExpectedReturn)), keccak256(abi.encode(DocReg.getPendingDoctor(1))));
         uint256 balanceAfter = PYUSD.balanceOf(alice);
@@ -72,7 +75,7 @@ contract DoctorRegistryTest is Test {
         DocReg.approveDoctor(1);
 
         Structs.RegStruct memory Reg =
-            Structs.RegStruct("Plairfx", "Mental-Health-Therapy", alice, consultationFeePerHour, 0);
+            Structs.RegStruct("Plairfx", "Mental-Health-Therapy", alice, consultationFeePerHour, 0, 0);
         PYUSD.approve(address(DocReg), currentStakeAmount);
         DocReg.registerAsDoctor(Reg);
 
@@ -82,8 +85,9 @@ contract DoctorRegistryTest is Test {
 
         DocReg.approveDoctor(1);
 
-        Structs.RegStruct memory ExpectedReturn =
-            Structs.RegStruct("Plairfx", "Mental-Health-Therapy", alice, consultationFeePerHour, currentStakeAmount);
+        Structs.RegStruct memory ExpectedReturn = Structs.RegStruct(
+            "Plairfx", "Mental-Health-Therapy", alice, consultationFeePerHour, stakeAmount, depositFee
+        );
 
         assertEq(keccak256(abi.encode(ExpectedReturn)), keccak256(abi.encode(DocReg.getDoctor(1))));
         uint256 balanceAfter = PYUSD.balanceOf(alice);
@@ -93,10 +97,8 @@ contract DoctorRegistryTest is Test {
     }
 
     function test_ApproverCanDenyPendingRequest() public registration {
-        uint256 currentStakeAmount = DocReg.stakeAmount();
-        uint256 balanceBefore = PYUSD.balanceOf(alice);
-
         vm.startPrank(alice);
+        uint256 balanceBefore = PYUSD.balanceOf(alice);
 
         vm.expectRevert();
         DocReg.denyDoctor(1);
@@ -107,16 +109,15 @@ contract DoctorRegistryTest is Test {
 
         DocReg.denyDoctor(1);
 
-        Structs.RegStruct memory ExpectedReturn =
-            Structs.RegStruct("Plairfx", "Mental-Health-Therapy", alice, consultationFeePerHour, currentStakeAmount);
+        Structs.RegStruct memory ExpectedReturn = Structs.RegStruct(
+            "Plairfx", "Mental-Health-Therapy", alice, consultationFeePerHour, stakeAmount, depositFee
+        );
 
-        assertNotEq(keccak256(abi.encode(ExpectedReturn)), keccak256(abi.encode(DocReg.getDoctor(1))));
         uint256 balanceAfter = PYUSD.balanceOf(alice);
 
-        assertNotEq(balanceBefore - DocReg.depositFee(), balanceAfter);
-        assertNotEq(PYUSD.balanceOf(address(DocReg)), DocReg.depositFee());
-        assertEq(balanceBefore - currentStakeAmount, balanceAfter);
-        assertEq(PYUSD.balanceOf(address(DocReg)), currentStakeAmount);
+        assertNotEq(keccak256(abi.encode(ExpectedReturn)), keccak256(abi.encode(DocReg.getDoctor(1))));
+        assertEq(balanceBefore, balanceAfter);
+        assertEq(PYUSD.balanceOf(address(DocReg)), stakeAmount);
     }
 
     function test_AdminCanChangeDepositFee() public {
@@ -128,7 +129,7 @@ contract DoctorRegistryTest is Test {
         vm.startPrank(admin);
 
         vm.expectEmit(true, true, true, true);
-        emit DoctorRegistry.DepositFeeChanged(5e6, 1e6);
+        emit DoctorRegistry.DepositFeeChanged(depositFee, 1e6);
 
         DocReg.changeDepositFee(1e6);
 
@@ -140,11 +141,10 @@ contract DoctorRegistryTest is Test {
         vm.expectRevert();
         DocReg.withdrawDepositFees();
 
-        uint256 currentDepositFee = DocReg.depositFee();
         uint256 balanceBefore = PYUSD.balanceOf(admin);
         vm.startPrank(admin);
         DocReg.withdrawDepositFees();
 
-        assertEq(balanceBefore + currentDepositFee, PYUSD.balanceOf(admin));
+        assertEq(balanceBefore + stakeAmount, PYUSD.balanceOf(admin));
     }
 }

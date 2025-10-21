@@ -25,10 +25,10 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
     IERC20 public immutable usdc;
     IERC20 public immutable usdt;
 
-    uint32 public numSessions;
-    mapping(uint256 => Structs.Session) public sessions;
-    mapping(address => uint256[]) public patientSessions;
-    mapping(uint256 => uint256[]) public doctorSessions;
+    uint256 public numSessions;
+    mapping(uint256 => Structs.Session) sessions;
+    mapping(address => uint256[]) patientSessions;
+    mapping(uint256 => uint256[]) doctorSessions;
 
     uint256 public pyUSDReserveBalance;
 
@@ -37,6 +37,7 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
     event SessionCreated(
         uint256 indexed sessionId, uint32 indexed doctorId, address indexed patient, uint256 feeUSD, uint256 pyusdAmount
     );
+
     event PaymentReleased(uint256 indexed sessionId, address indexed doctor, uint256 amount);
 
     constructor(address _doctorRegistry, address _pythOracle, address _pyusd, address _usdc, address _usdt) {
@@ -84,6 +85,9 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
         } else if (tokenAddress == address(usdt)) {
             pyusdValue = pythOracle.getUsdtToPyusd{value: updateFee}(consultationPayment, priceUpdateData);
             paymentMethod = usdt;
+        } else if (tokenAddress == address(pyusd)) {
+            pyusdValue = consultationPayment;
+            paymentMethod = pyusd;
         } else {
             revert("Invalid payment");
         }
@@ -96,7 +100,7 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
 
         pyUSDReserveBalance -= pyusdNeeded;
 
-        uint32 sessionId = ++numSessions;
+        uint256 sessionId = ++numSessions;
 
         sessions[sessionId] = Structs.Session({
             status: uint8(SessionStatus.Active),
@@ -114,7 +118,9 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
         // Transfer payment tokens from patient to contract
         if (address(paymentMethod) == address(0)) {
             if (pyusdValue > consultationPayment) {
-                pyusd.safeTransfer(msg.sender, (pyusdValue - consultationPayment));
+                uint256 pyusdreturned = pyusdValue - consultationPayment;
+                pyusd.safeTransfer(msg.sender, pyusdreturned);
+                pyUSDReserveBalance -= pyusdreturned;
             }
         } else {
             IERC20(paymentMethod).safeTransferFrom(msg.sender, address(this), consultationPayment);
@@ -168,7 +174,8 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
      */
     function withdrawEth(uint256 amount) external onlyRole(ADMIN_ROLE) {
         require(amount > 0, "Invalid amount");
-        payable(msg.sender).transfer(amount);
+        (bool success,) = msg.sender.call{value: amount}("");
+        require(success);
     }
 
     /**

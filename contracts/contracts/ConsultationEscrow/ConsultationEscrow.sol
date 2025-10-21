@@ -29,6 +29,7 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
     mapping(uint256 => Structs.Session) sessions;
     mapping(address => uint256[]) patientSessions;
     mapping(uint256 => uint256[]) doctorSessions;
+    mapping(uint32 => uint8[]) doctorRatings;
 
     uint256 public pyUSDReserveBalance;
 
@@ -39,6 +40,7 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
     );
 
     event PaymentReleased(uint256 indexed sessionId, address indexed doctor, uint256 amount);
+    event DoctorRated(uint32 doctorId, uint32 sessionID, uint16 rating);
 
     constructor(address _doctorRegistry, address _pythOracle, address _pyusd, address _usdc, address _usdt) {
         doctorRegistry = IDoctorRegistry(_doctorRegistry);
@@ -130,6 +132,23 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
     }
 
     /**
+     * @notice Rate the sessions from your doctor.
+     * @param _sessionID The session ID
+     * @param _rating rate your experience.
+     */
+    function rateSession(uint32 _sessionID, uint8 _rating) external {
+        require(_rating <= 100, "Rating needs to between 0-100");
+
+        Structs.Session memory session = sessions[_sessionID];
+        require(session.patient == msg.sender, "Not the patient");
+        require(session.status == uint8(SessionStatus.Completed), "Session not Completed");
+
+        doctorRatings[session.doctorId].push(_rating);
+
+        emit DoctorRated(session.doctorId, _sessionID, _rating);
+    }
+
+    /**
      * @notice Release payment to doctor after session completion (admin only)
      * @param sessionId The session ID
      */
@@ -203,6 +222,15 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
      */
     function getDoctorSessions(uint32 doctorId) external view returns (uint256[] memory) {
         return doctorSessions[doctorId];
+    }
+
+    /**
+     * @notice Get doctor ratings
+     * @param doctorId Doctor ID
+     * @return Array of ratings IDs
+     */
+    function getDoctorRatings(uint32 doctorId) external view returns (uint8[] memory) {
+        return doctorRatings[doctorId];
     }
 
     /**

@@ -263,4 +263,38 @@ contract ConsultationEscrowTest is Test {
         assertEq(ConsultEscrow.pyUSDReserveBalance(), balanceBeforeCE);
         assertEq(balanceBeforeCE, PYUSD.balanceOf(address(ConsultEscrow)));
     }
+
+    function test_RateSessionFromYourDoctor() public sessionsCreated {
+        uint256 doctorBalanceBefore = PYUSD.balanceOf(doctor);
+        uint256 EscrowBalanceBefore = PYUSD.balanceOf(address(ConsultEscrow));
+        uint32 currentSessionID = ConsultEscrow.numSessions();
+        bytes32 ipfsHash = keccak256(abi.encodePacked("PrescriptionIPFSHash"));
+
+        vm.startPrank(alice);
+        vm.expectRevert("Session not Completed");
+        ConsultEscrow.rateSession(currentSessionID, 100);
+
+        vm.startPrank(doctor);
+        ConsultEscrow.releasePayment(currentSessionID, ipfsHash);
+        Structs.Session memory sessions = ConsultEscrow.getSession(currentSessionID);
+
+        vm.startPrank(alice);
+        vm.expectRevert("Rating needs to between 0-100");
+        ConsultEscrow.rateSession(currentSessionID, 101);
+
+        address bob = makeAddr("bob");
+        vm.startPrank(bob);
+        vm.expectRevert("Not the patient");
+        ConsultEscrow.rateSession(currentSessionID, 100);
+
+        vm.startPrank(alice);
+
+        vm.expectEmit(true, true, true, true);
+        emit ConsultationEscrow.DoctorRated(1, currentSessionID, 100);
+        ConsultEscrow.rateSession(currentSessionID, 100);
+
+        uint8[] memory ratings = ConsultEscrow.getDoctorRatings(1);
+
+        assertEq(ratings[0], 100);
+    }
 }

@@ -25,7 +25,7 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
     IERC20 public immutable usdc;
     IERC20 public immutable usdt;
 
-    uint256 public numSessions;
+    uint32 public numSessions;
     mapping(uint256 => Structs.Session) sessions;
     mapping(address => uint256[]) patientSessions;
     mapping(uint256 => uint256[]) doctorSessions;
@@ -100,7 +100,7 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
 
         pyUSDReserveBalance -= pyusdNeeded;
 
-        uint256 sessionId = ++numSessions;
+        uint32 sessionId = ++numSessions;
 
         sessions[sessionId] = Structs.Session({
             status: uint8(SessionStatus.Active),

@@ -67,11 +67,8 @@ contract ConsultationEscrowTest is Test {
         vm.startPrank(doctor);
         PYUSD.faucet(10e6);
 
-        Structs.RegStruct memory Reg =
-            Structs.RegStruct("Alice", "Mental-Health-Therapy", doctor, consultationFeePerHour, 0, 0);
-
         PYUSD.approve(address(DocReg), stakeAmount);
-        DocReg.registerAsDoctor(Reg);
+        DocReg.registerAsDoctor("Alice", "Mental-Health-Therapy", consultationFeePerHour, bytes32(uint256(123)));
 
         vm.startPrank(admin);
         DocReg.grantRole(keccak256("APPROVER"), admin);
@@ -183,7 +180,7 @@ contract ConsultationEscrowTest is Test {
 
         vm.startPrank(alice);
         uint256 CEbalanceBeforeETH = address(ConsultEscrow).balance;
-        uint256 currentSessionID = ConsultEscrow.numSessions();
+        uint32 currentSessionID = ConsultEscrow.numSessions();
 
         vm.expectEmit(true, true, true, true);
         emit ConsultationEscrow.SessionCreated(
@@ -195,35 +192,35 @@ contract ConsultationEscrowTest is Test {
         Structs.Session memory sessionss = ConsultEscrow.getSession(currentSessionID + 1);
 
         Structs.Session memory sessionss1 =
-            Structs.Session(uint8(0), 1, (currentSessionID + 1), alice, consultationFeePerHour, BS);
+            Structs.Session(uint8(0), 1, (currentSessionID + 1), alice, bytes32(0), consultationFeePerHour, BS);
 
-        uint256[] memory patientSessiosn = ConsultEscrow.getPatientSessions(alice);
+        uint256[] memory patientSessions = ConsultEscrow.getPatientSessions(alice);
         uint256[] memory doctorSessions = ConsultEscrow.getDoctorSessions(1);
 
         assertEq(keccak256(abi.encode(sessionss)), keccak256(abi.encode(sessionss1)));
         assertEq(aliceBalanceBefore - 0.02 ether, alice.balance);
         assertEq(address(ConsultEscrow).balance, CEbalanceBeforeETH + 0.02 ether - updateFee);
-        assertEq(doctorSessions[currentSessionID], patientSessiosn[currentSessionID]);
+        assertEq(doctorSessions[currentSessionID], patientSessions[currentSessionID]);
     }
 
     function test_releasePayment() public sessionsCreated {
         uint256 doctorBalanceBefore = PYUSD.balanceOf(doctor);
         uint256 EscrowBalanceBefore = PYUSD.balanceOf(address(ConsultEscrow));
-        uint256 currentSessionID = ConsultEscrow.numSessions();
+        uint32 currentSessionID = ConsultEscrow.numSessions();
+        bytes32 ipfsHash = keccak256(abi.encodePacked("PrescriptionIPFSHash"));
 
-        vm.startPrank(admin);
-
+        vm.startPrank(doctor);
         vm.expectEmit(true, true, true, true);
         emit ConsultationEscrow.PaymentReleased(currentSessionID, doctor, consultationFeePerHour);
 
-        ConsultEscrow.releasePayment(currentSessionID);
+        ConsultEscrow.releasePayment(currentSessionID, ipfsHash);
         Structs.Session memory sessions = ConsultEscrow.getSession(currentSessionID);
         assertEq(PYUSD.balanceOf(doctor), doctorBalanceBefore + consultationFeePerHour);
         assertEq(EscrowBalanceBefore - consultationFeePerHour, PYUSD.balanceOf(address(ConsultEscrow)));
         assertEq(sessions.status, uint8(1));
 
         vm.expectRevert("Session not active");
-        ConsultEscrow.releasePayment(1);
+        ConsultEscrow.releasePayment(1, ipfsHash);
     }
 
     function test_withdrawETHandDepositETH() public {

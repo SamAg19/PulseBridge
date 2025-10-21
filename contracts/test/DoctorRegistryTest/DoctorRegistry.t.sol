@@ -18,6 +18,9 @@ contract DoctorRegistryTest is Test {
     uint256 stakeAmount = 5e6;
     uint256 depositFee = 1e6;
 
+    bytes32 validDocIPFSHash = keccak256(abi.encodePacked("validDocumentsHash"));
+    bytes32 invalidDocIPFSHash = keccak256(abi.encodePacked("invalidDocumentsHash"));
+
     function setUp() public {
         vm.startPrank(admin);
         PYUSD = new MockERC20("PayPal USD", "pyUSD");
@@ -31,12 +34,9 @@ contract DoctorRegistryTest is Test {
     }
 
     modifier registration() {
-        uint256 currentDepositFee = DocReg.depositFee();
-        Structs.RegStruct memory Reg =
-            Structs.RegStruct("Plairfx", "Mental-Health-Therapy", alice, consultationFeePerHour, 0, 0);
         vm.startPrank(alice);
-        PYUSD.approve(address(DocReg), stakeAmount + depositFee);
-        DocReg.registerAsDoctor(Reg);
+        PYUSD.approve(address(DocReg), stakeAmount);
+        DocReg.registerAsDoctor("Plairfx", "Mental-Health-Therapy", consultationFeePerHour, invalidDocIPFSHash);
         _;
     }
 
@@ -44,19 +44,16 @@ contract DoctorRegistryTest is Test {
         uint256 currentStakeAmount = DocReg.stakeAmount();
 
         uint256 balanceBefore = PYUSD.balanceOf(alice);
-        Structs.RegStruct memory Reg =
-            Structs.RegStruct("Plairfx", "Mental-Health-Therapy", address(0x0), consultationFeePerHour, 0, 0);
 
         vm.startPrank(alice);
-        PYUSD.approve(address(DocReg), currentStakeAmount + depositFee);
-        vm.expectRevert("Wallet cannot be a zero address!");
-        DocReg.registerAsDoctor(Reg);
+        PYUSD.approve(address(DocReg), currentStakeAmount);
+        vm.expectRevert("Legal documents IPFS hash is required!");
+        DocReg.registerAsDoctor("Plairfx", "Mental-Health-Therapy", consultationFeePerHour, bytes32(0));
 
-        Reg.paymentWallet = address(alice);
-        DocReg.registerAsDoctor(Reg);
+        DocReg.registerAsDoctor("Plairfx", "Mental-Health-Therapy", consultationFeePerHour, validDocIPFSHash);
 
         Structs.RegStruct memory ExpectedReturn = Structs.RegStruct(
-            "Plairfx", "Mental-Health-Therapy", alice, consultationFeePerHour, stakeAmount, depositFee
+            "Plairfx", "Mental-Health-Therapy", alice, consultationFeePerHour, depositFee, validDocIPFSHash
         );
 
         assertEq(keccak256(abi.encode(ExpectedReturn)), keccak256(abi.encode(DocReg.getPendingDoctor(1))));
@@ -74,10 +71,8 @@ contract DoctorRegistryTest is Test {
         vm.expectRevert();
         DocReg.approveDoctor(1);
 
-        Structs.RegStruct memory Reg =
-            Structs.RegStruct("Plairfx", "Mental-Health-Therapy", alice, consultationFeePerHour, 0, 0);
         PYUSD.approve(address(DocReg), currentStakeAmount);
-        DocReg.registerAsDoctor(Reg);
+        DocReg.registerAsDoctor("Plairfx", "Mental-Health-Therapy", consultationFeePerHour, validDocIPFSHash);
 
         vm.startPrank(approver);
         vm.expectEmit(true, true, true, true);
@@ -86,7 +81,7 @@ contract DoctorRegistryTest is Test {
         DocReg.approveDoctor(1);
 
         Structs.RegStruct memory ExpectedReturn = Structs.RegStruct(
-            "Plairfx", "Mental-Health-Therapy", alice, consultationFeePerHour, stakeAmount, depositFee
+            "Plairfx", "Mental-Health-Therapy", alice, consultationFeePerHour, depositFee, validDocIPFSHash
         );
 
         assertEq(keccak256(abi.encode(ExpectedReturn)), keccak256(abi.encode(DocReg.getDoctor(1))));
@@ -110,7 +105,7 @@ contract DoctorRegistryTest is Test {
         DocReg.denyDoctor(1);
 
         Structs.RegStruct memory ExpectedReturn = Structs.RegStruct(
-            "Plairfx", "Mental-Health-Therapy", alice, consultationFeePerHour, stakeAmount, depositFee
+            "Plairfx", "Mental-Health-Therapy", alice, consultationFeePerHour, depositFee, invalidDocIPFSHash
         );
 
         uint256 balanceAfter = PYUSD.balanceOf(alice);
@@ -142,9 +137,11 @@ contract DoctorRegistryTest is Test {
         DocReg.withdrawDepositFees();
 
         uint256 balanceBefore = PYUSD.balanceOf(admin);
+        uint256 totalPYUsdToBeCollected = DocReg.totalPYUsdToBeCollected();
         vm.startPrank(admin);
         DocReg.withdrawDepositFees();
 
-        assertEq(balanceBefore + stakeAmount, PYUSD.balanceOf(admin));
+        assertEq(balanceBefore + totalPYUsdToBeCollected, PYUSD.balanceOf(admin));
+        assertEq(0, DocReg.totalPYUsdToBeCollected());
     }
 }

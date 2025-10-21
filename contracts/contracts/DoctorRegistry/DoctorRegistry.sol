@@ -16,7 +16,8 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
     address public depositToken;
     uint256 public depositFee;
     uint256 public stakeAmount;
-    uint32 doctorID;
+    uint256 public totalPYUsdToBeCollected;
+    uint32 numDoctors;
     bytes32 public constant APPROVER = keccak256("APPROVER");
 
     event PendingRegistration(uint32 docID);
@@ -25,26 +26,43 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
     event DoctorApproved(uint32 docID);
     event DoctorDenied(uint32 docID);
 
-    constructor(address _owner, uint256 _depositFee, address _depositToken) {
+    constructor(address _owner, uint256 _depositFee, uint256 _stakeAmount, address _depositToken) {
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
+        stakeAmount = _stakeAmount;
         depositFee = _depositFee;
         depositToken = _depositToken;
     }
 
     /**
      * @notice Register as a doctor.
-     * @param regStruct has Name, Services, Consultation Fee, and Payment wallet
+     * @param name Name of the doctor
+     * @param specialization Specialization of the doctor
+     * @param consultationFees Consultation fees per hour
+     * @param legalDocumentsIPFSHash IPFS hash of legal documents
      * required for the registration process.
      */
-    function registerAsDoctor(Structs.RegStruct memory regStruct) public {
-        require(regStruct.paymentWallet != address(0x0), "Wallet cannot be a zero address!");
+    function registerAsDoctor(
+        string calldata name, 
+        string calldata specialization, 
+        uint256 consultationFees,
+        bytes32 legalDocumentsIPFSHash
+    ) public {
+        require(legalDocumentsIPFSHash != bytes32(0), "Legal documents IPFS hash is required!");
 
-        doctorID++;
-        regStruct.depositFeeStored = depositFee;
-        PendingRegistry[doctorID] = regStruct;
+        numDoctors++;
+        PendingRegistry[numDoctors] = Structs.RegStruct({
+            Name: name,
+            specialization: specialization,
+            doctorAddress: msg.sender,
+            consultationFeePerHour: consultationFees,
+            depositFeeStored: depositFee,
+            legalDocumentsIPFSHash: legalDocumentsIPFSHash
+        });
+
+        totalPYUsdToBeCollected += depositFee;
 
         IERC20(depositToken).transferFrom(msg.sender, address(this), stakeAmount);
-        emit PendingRegistration(doctorID);
+        emit PendingRegistration(numDoctors);
     }
 
     /**
@@ -54,8 +72,8 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
     function approveDoctor(uint32 _docID) public onlyRole(APPROVER) {
         Structs.RegStruct memory Docreg = getPendingDoctor(_docID);
         ApprovedRegistry[_docID] = Docreg;
-        IERC20(depositToken).transfer(Docreg.paymentWallet, stakeAmount - Docreg.depositFeeStored);
-        emit DoctorApproved(doctorID);
+        IERC20(depositToken).transfer(Docreg.doctorAddress, stakeAmount - Docreg.depositFeeStored);
+        emit DoctorApproved(numDoctors);
     }
 
     /**
@@ -63,6 +81,8 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
      * @param _docID the doctor that gets approved.
      */
     function denyDoctor(uint32 _docID) public onlyRole(APPROVER) {
+        Structs.RegStruct memory Docreg = getPendingDoctor(_docID);
+        totalPYUsdToBeCollected += stakeAmount - Docreg.depositFeeStored;
         delete PendingRegistry[_docID];
         emit DoctorDenied(_docID);
     }
@@ -72,7 +92,8 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
      * Admin is TRUSTED.
      */
     function withdrawDepositFees() public onlyRole(DEFAULT_ADMIN_ROLE) {
-        IERC20(depositToken).transfer(msg.sender, IERC20(depositToken).balanceOf(address(this)));
+        IERC20(depositToken).transfer(msg.sender, totalPYUsdToBeCollected);
+        totalPYUsdToBeCollected = 0;
     }
 
     /**

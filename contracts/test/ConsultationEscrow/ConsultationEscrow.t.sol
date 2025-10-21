@@ -53,11 +53,8 @@ contract ConsultationEscrowTest is Test {
         vm.startPrank(doctor);
         PYUSD.faucet(10e6);
 
-        Structs.RegStruct memory Reg =
-            Structs.RegStruct("Alice", "Mental-Health-Therapy", doctor, consultationFeePerHour, 0, 0);
-
         PYUSD.approve(address(DocReg), stakeAmount);
-        DocReg.registerAsDoctor(Reg);
+        DocReg.registerAsDoctor("Alice", "Mental-Health-Therapy", consultationFeePerHour, bytes32(uint256(123)));
 
         vm.startPrank(admin);
         DocReg.grantRole(keccak256("APPROVER"), admin);

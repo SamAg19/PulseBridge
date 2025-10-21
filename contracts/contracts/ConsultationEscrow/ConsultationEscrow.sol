@@ -64,7 +64,7 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
         address tokenAddress
     ) external payable {
         Structs.RegStruct memory doctor = doctorRegistry.getDoctor(doctorId);
-        require(doctor.paymentWallet != address(0), "Doctor not found");
+        require(doctor.doctorAddress != address(0), "Doctor not found");
 
         uint256 updateFee = pythOracle.getUpdateFee(priceUpdateData);
         require(address(this).balance >= updateFee, "Insufficient contract ETH for oracle fee");
@@ -103,6 +103,7 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
             doctorId: doctorId,
             sessionId: sessionId,
             patient: msg.sender,
+            doctorPrescriptionIPFSHash: bytes32(0),
             pyusdAmount: pyusdNeeded,
             createdAt: block.timestamp
         });
@@ -126,18 +127,19 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
      * @notice Release payment to doctor after session completion (admin only)
      * @param sessionId The session ID
      */
-    function releasePayment(uint256 sessionId) external onlyRole(ADMIN_ROLE) nonReentrant {
+    function releasePayment(uint256 sessionId, bytes32 ipfsHash) external nonReentrant {
         Structs.Session storage session = sessions[sessionId];
         require(session.status == uint8(SessionStatus.Active), "Session not active");
 
         Structs.RegStruct memory doctor = doctorRegistry.getDoctor(session.doctorId);
-        require(doctor.paymentWallet != address(0), "Invalid doctor wallet");
+        require(doctor.doctorAddress == msg.sender, "Invalid doctor caller");
 
-        pyusd.safeTransfer(doctor.paymentWallet, session.pyusdAmount);
+        pyusd.safeTransfer(doctor.doctorAddress, session.pyusdAmount);
 
         session.status = uint8(SessionStatus.Completed);
+        session.doctorPrescriptionIPFSHash = ipfsHash;
 
-        emit PaymentReleased(sessionId, doctor.paymentWallet, session.pyusdAmount);
+        emit PaymentReleased(sessionId, doctor.doctorAddress, session.pyusdAmount);
     }
 
     /**

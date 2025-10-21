@@ -213,11 +213,60 @@ contract ConsultationEscrowTest is Test {
         uint256 doctorBalanceBefore = PYUSD.balanceOf(doctor);
         uint256 EscrowBalanceBefore = PYUSD.balanceOf(address(ConsultEscrow));
         uint256 currentSessionID = ConsultEscrow.numSessions();
+
         vm.startPrank(admin);
 
-        // vm.expectEmit(true, true, true, true);
+        vm.expectEmit(true, true, true, true);
+        emit ConsultationEscrow.PaymentReleased(currentSessionID, doctor, consultationFeePerHour);
 
-        // ConsultEscrow.releasePayment(currentSessionID);
-        // @Q No feature yet of setting the sessionID to complete?
+        ConsultEscrow.releasePayment(currentSessionID);
+        Structs.Session memory sessions = ConsultEscrow.getSession(currentSessionID);
+        assertEq(PYUSD.balanceOf(doctor), doctorBalanceBefore + consultationFeePerHour);
+        assertEq(EscrowBalanceBefore - consultationFeePerHour, PYUSD.balanceOf(address(ConsultEscrow)));
+        assertEq(sessions.status, uint8(1));
+
+        vm.expectRevert("Session not active");
+        ConsultEscrow.releasePayment(1);
+    }
+
+    function test_withdrawETHandDepositETH() public {
+        vm.startPrank(admin);
+        vm.expectRevert("Invalid amount");
+        ConsultEscrow.withdrawEth(0);
+
+        vm.expectRevert();
+        ConsultEscrow.withdrawEth(1 ether);
+        vm.deal(admin, 1 ether);
+
+        (bool success,) = address(ConsultEscrow).call{value: 1 ether}("");
+        assertEq(address(ConsultEscrow).balance, 1 ether);
+
+        ConsultEscrow.withdrawEth(1 ether);
+        assertEq(address(ConsultEscrow).balance, 0 ether);
+    }
+
+    function test_withdrawAndDepositPYUSD() public {
+        uint256 balanceBeforeCE = PYUSD.balanceOf(address(ConsultEscrow));
+        uint256 balanceBeforeDepositADmin = PYUSD.balanceOf(admin);
+
+        vm.startPrank(admin);
+        vm.expectRevert("Insufficient balance");
+        ConsultEscrow.withdrawPyusdReserve(1e6);
+
+        vm.expectRevert("Invalid amount");
+        ConsultEscrow.depositPyusdReserve(0);
+
+        PYUSD.approve(address(ConsultEscrow), 1e6);
+        ConsultEscrow.depositPyusdReserve(1e6);
+
+        assertEq(balanceBeforeCE + 1e6, PYUSD.balanceOf(address(ConsultEscrow)));
+        assertEq(ConsultEscrow.pyUSDReserveBalance(), balanceBeforeCE + 1e6);
+        assertEq(balanceBeforeDepositADmin - 1e6, PYUSD.balanceOf(admin));
+
+        ConsultEscrow.withdrawPyusdReserve(1e6);
+
+        assertEq(balanceBeforeDepositADmin, PYUSD.balanceOf(admin));
+        assertEq(ConsultEscrow.pyUSDReserveBalance(), balanceBeforeCE);
+        assertEq(balanceBeforeCE, PYUSD.balanceOf(address(ConsultEscrow)));
     }
 }

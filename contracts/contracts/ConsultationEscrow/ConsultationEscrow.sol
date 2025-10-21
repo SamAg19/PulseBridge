@@ -26,9 +26,9 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
     IERC20 public immutable usdt;
 
     uint256 public numSessions;
-    mapping(uint256 => Structs.Session) public sessions;
-    mapping(address => uint256[]) public patientSessions;
-    mapping(uint256 => uint256[]) public doctorSessions;
+    mapping(uint256 => Structs.Session) sessions;
+    mapping(address => uint256[]) patientSessions;
+    mapping(uint256 => uint256[]) doctorSessions;
 
     uint256 public pyUSDReserveBalance;
 
@@ -172,7 +172,8 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
      */
     function withdrawEth(uint256 amount) external onlyRole(ADMIN_ROLE) {
         require(amount > 0, "Invalid amount");
-        payable(msg.sender).transfer(amount);
+        (bool success,) = msg.sender.call{value: amount}("");
+        require(success);
     }
 
     /**

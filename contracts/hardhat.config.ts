@@ -21,6 +21,13 @@ const config: HardhatUserConfig = {
       },
     },
   },
+   verify: {
+    etherscan: {
+      apiKey:  configVariable("SEPOLIA_RPC_URL"),
+    },
+  },
+
+
   networks: {
     hardhatMainnet: {
       type: "edr-simulated",

@@ -1,0 +1,45 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_30-ebcdb8b1e0bdd6424c83d692b022d92de41eac08",
+  "solcVersion": "0.8.30",
+  "solcLongVersion": "0.8.30+commit.73712a01",
+  "userSourceNameMap": {
+    "contracts/Oracle/PythPriceConsumer.sol": "project/contracts/Oracle/PythPriceConsumer.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "prague",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/Oracle/IPyth.sol": {
+        "content": "// SPDX-License-Identifier: MIT\n\npragma solidity 0.8.30;\n\n/**\n * @title IPyth\n * @dev Interface for Pyth Network price oracle\n * @notice Based on Pyth Network's actual interface\n */\ninterface IPyth {\n    /// @dev Represents a price with confidence interval\n    struct Price {\n        // Price value (e.g., for ETH/USD, this would be price in USD * 10^expo)\n        int64 price;\n        // Confidence interval around the price\n        uint64 conf;\n        // Price exponent (e.g., -8 means price is in units of 10^-8)\n        int32 expo;\n        // Unix timestamp of when the price was published\n        uint publishTime;\n    }\n\n    /// @dev Represents a full price feed with EMA\n    struct PriceFeed {\n        // Unique identifier for this price feed\n        bytes32 id;\n        // Latest available price\n        Price price;\n        // Exponentially-weighted moving average price\n        Price emaPrice;\n    }\n\n    /**\n     * @notice Returns the price that is no older than the given age\n     * @param id The price feed identifier\n     * @param age Maximum age of the price in seconds\n     * @return price The price data\n     */\n    function getPriceNoOlderThan(bytes32 id, uint age) external view returns (Price memory price);\n\n    /**\n     * @notice Updates price feeds with the given data\n     * @param updateData Array of price update data from Pyth\n     */\n    function updatePriceFeeds(bytes[] calldata updateData) external payable;\n\n    /**\n     * @notice Returns the required fee for updating price feeds\n     * @param updateData Array of price update data\n     * @return feeAmount The fee in wei\n     */\n    function getUpdateFee(bytes[] calldata updateData) external view returns (uint feeAmount);\n}\n"
+      },
+      "project/contracts/Oracle/IPythPriceConsumer.sol": {
+        "content": "// SPDX-License-Identifier: MIT\n\npragma solidity 0.8.30;\n\ninterface IPythPriceConsumer {\n    function getEthToPyusd(uint256 ethAmount, bytes[] calldata priceUpdateData) external payable returns (uint256);\n    function getUsdtToPyusd(uint256 usdtAmount, bytes[] calldata priceUpdateData) external payable returns (uint256);\n    function getUsdcToPyusd(uint256 usdcAmount, bytes[] calldata priceUpdateData) external payable returns (uint256);\n    function getUpdateFee(bytes[] calldata updateData) external view returns (uint256);\n\n}\n"
+      },
+      "project/contracts/Oracle/PythPriceConsumer.sol": {
+        "content": "// SPDX-License-Identifier: MIT\n\npragma solidity 0.8.30;\n\nimport {IPyth} from \"./IPyth.sol\";\nimport {IPythPriceConsumer} from \"./IPythPriceConsumer.sol\";\n\ncontract PythPriceConsumer is IPythPriceConsumer {\n    IPyth public immutable pyth;\n\n    // Pyth price feed IDs\n    bytes32 public constant ETH_USD_PRICE_ID = 0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace;\n    bytes32 public constant USDT_USD_PRICE_ID = 0x2b89b9dc8fdf9f34709a5b106b472f0f39bb6ca9ce04b0fd7f2e971688e2e53b;\n    bytes32 public constant USDC_USD_PRICE_ID = 0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a;\n    bytes32 public constant PYUSD_USD_PRICE_ID = 0x3f9c88e4cc2f33c57c5d0897ea89c26d90ef4ff9cc442a20d1d71c0a7e7f9e46;\n\n    // Maximum acceptable price age in seconds (fixed at 60 seconds)\n    uint256 public constant MAX_PRICE_AGE = 60;\n\n    constructor(address _pyth) {\n        require(_pyth != address(0), \"PythPriceConsumer: invalid pyth address\");\n        pyth = IPyth(_pyth);\n    }\n\n    /**\n     * @notice Update price feeds and convert ETH to pyUSD\n     * @param ethAmount Amount of ETH (in wei)\n     * @param priceUpdateData Price update data from Pyth Price Service API\n     * @return pyusdAmount Amount in pyUSD (with 6 decimals)\n     *\n     * @dev Fetches ETH/USD and pyUSD/USD prices, then calculates ETH to pyUSD conversion\n     *      Formula: (ethAmount * ethUsdPrice) / pyUsdPrice\n     */\n    function getEthToPyusd(uint256 ethAmount, bytes[] calldata priceUpdateData)\n        external\n        payable\n        returns (uint256 pyusdAmount)\n    {\n        uint256 updateFee = pyth.getUpdateFee(priceUpdateData);\n        require(msg.value >= updateFee, \"PythPriceConsumer: insufficient update fee\");\n\n        pyth.updatePriceFeeds{value: updateFee}(priceUpdateData);\n\n        IPyth.Price memory ethPrice = pyth.getPriceNoOlderThan(ETH_USD_PRICE_ID, MAX_PRICE_AGE);\n        require(ethPrice.price > 0, \"PythPriceConsumer: invalid ETH price\");\n\n        IPyth.Price memory pyusdPrice = pyth.getPriceNoOlderThan(PYUSD_USD_PRICE_ID, MAX_PRICE_AGE);\n        require(pyusdPrice.price > 0, \"PythPriceConsumer: invalid pyUSD price\");\n\n        uint256 ethUsdValue = (ethAmount * uint256(uint64(ethPrice.price))) / 1e18;\n\n        pyusdAmount = (ethUsdValue * 1e6) / uint256(uint64(pyusdPrice.price));\n\n        if (msg.value > updateFee) {\n            payable(msg.sender).transfer(msg.value - updateFee);\n        }\n\n        return pyusdAmount;\n    }\n\n    /**\n     * @notice Update price feeds and convert USDT to pyUSD\n     * @param usdtAmount Amount of USDT (with 6 decimals)\n     * @param priceUpdateData Price update data from Pyth Price Service API\n     * @return pyusdAmount Amount in pyUSD (with 6 decimals)\n     *\n     * @dev Fetches USDT/USD and pyUSD/USD prices, then calculates USDT to pyUSD conversion\n     */\n    function getUsdtToPyusd(uint256 usdtAmount, bytes[] calldata priceUpdateData)\n        external\n        payable\n        returns (uint256 pyusdAmount)\n    {\n        uint256 updateFee = pyth.getUpdateFee(priceUpdateData);\n        require(msg.value >= updateFee, \"PythPriceConsumer: insufficient update fee\");\n\n        pyth.updatePriceFeeds{value: updateFee}(priceUpdateData);\n\n        IPyth.Price memory usdtPrice = pyth.getPriceNoOlderThan(USDT_USD_PRICE_ID, MAX_PRICE_AGE);\n        require(usdtPrice.price > 0, \"PythPriceConsumer: invalid USDT price\");\n\n        IPyth.Price memory pyusdPrice = pyth.getPriceNoOlderThan(PYUSD_USD_PRICE_ID, MAX_PRICE_AGE);\n        require(pyusdPrice.price > 0, \"PythPriceConsumer: invalid pyUSD price\");\n\n        uint256 usdValue = (usdtAmount * uint256(uint64(usdtPrice.price))) / 1e6;\n\n        pyusdAmount = (usdValue * 1e6) / uint256(uint64(pyusdPrice.price));\n\n        if (msg.value > updateFee) {\n            payable(msg.sender).transfer(msg.value - updateFee);\n        }\n\n        return pyusdAmount;\n    }\n\n    /**\n     * @notice Update price feeds and convert USDC to pyUSD\n     * @param usdcAmount Amount of USDC (with 6 decimals)\n     * @param priceUpdateData Price update data from Pyth Price Service API\n     * @return pyusdAmount Amount in pyUSD (with 6 decimals)\n     *\n     * @dev Fetches USDC/USD and pyUSD/USD prices, then calculates USDC to pyUSD conversion\n     */\n    function getUsdcToPyusd(uint256 usdcAmount, bytes[] calldata priceUpdateData)\n        external\n        payable\n        returns (uint256 pyusdAmount)\n    {\n        uint256 updateFee = pyth.getUpdateFee(priceUpdateData);\n        require(msg.value >= updateFee, \"PythPriceConsumer: insufficient update fee\");\n\n        pyth.updatePriceFeeds{value: updateFee}(priceUpdateData);\n\n        IPyth.Price memory usdcPrice = pyth.getPriceNoOlderThan(USDC_USD_PRICE_ID, MAX_PRICE_AGE);\n        require(usdcPrice.price > 0, \"PythPriceConsumer: invalid USDC price\");\n\n        IPyth.Price memory pyusdPrice = pyth.getPriceNoOlderThan(PYUSD_USD_PRICE_ID, MAX_PRICE_AGE);\n        require(pyusdPrice.price > 0, \"PythPriceConsumer: invalid pyUSD price\");\n\n        uint256 usdValue = (usdcAmount * uint256(uint64(usdcPrice.price))) / 1e6;\n\n        pyusdAmount = (usdValue * 1e6) / uint256(uint64(pyusdPrice.price));\n\n        if (msg.value > updateFee) {\n            payable(msg.sender).transfer(msg.value - updateFee);\n        }\n\n        return pyusdAmount;\n    }\n\n    /**\n     * @notice Get the update fee for Pyth price updates\n     * @param updateData The update data from Pyth\n     * @return fee The fee in wei\n     */\n    function getUpdateFee(bytes[] calldata updateData) external view returns (uint256 fee) {\n        return pyth.getUpdateFee(updateData);\n    }\n}\n"
+      }
+    }
+  }
+}

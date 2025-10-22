@@ -1,5 +1,6 @@
 import os
 import json
+import asyncio
 from pathlib import Path
 from dotenv import load_dotenv
 from uagents import Agent, Context
@@ -93,10 +94,51 @@ else:
     contract = None
     print("Warning: Contract not initialized. Please deploy contracts first.")
 
+event_listener_task = None
+
+async def listen_for_session_created_events(ctx: Context):
+    """Listen for SessionCreated events from the contract"""
+    if not contract:
+        ctx.logger.error("Contract not initialized. Cannot listen for events.")
+        return
+
+    ctx.logger.info("Starting SessionCreated event listener...")
+
+    event_filter = contract.events.SessionCreated.create_filter(from_block='latest')
+
+    try:
+        while True:
+            for event in event_filter.get_new_entries():
+                session_id = event['args']['sessionId']
+                doctor_id = event['args']['doctorId']
+                patient = event['args']['patient']
+                fee_usd = event['args']['feeUSD']
+                pyusd_amount = event['args']['pyusdAmount']
+
+                ctx.logger.info("=" * 60)
+                ctx.logger.info("🚨 NEW SESSION CREATED EVENT DETECTED!")
+                ctx.logger.info("=" * 60)
+                ctx.logger.info(f"Session ID: {session_id}")
+                ctx.logger.info(f"Doctor ID: {doctor_id}")
+                ctx.logger.info(f"Patient: {patient}")
+                ctx.logger.info(f"Fee (USD): {fee_usd}")
+                ctx.logger.info(f"PYUSD Amount: {pyusd_amount}")
+                ctx.logger.info(f"Block Number: {event['blockNumber']}")
+                ctx.logger.info(f"Transaction Hash: {event['transactionHash'].hex()}")
+                ctx.logger.info("=" * 60)
+
+            ctx.logger.info("[Event Listener] Waiting for new events...")
+            await asyncio.sleep(5)
+
+    except Exception as e:
+        ctx.logger.error(f"Error in event listener: {str(e)}")
+
 # startup handler
 @agent.on_event("startup")
 async def check_balance(ctx: Context):
     """Check ETH balance and contract info on agent startup"""
+    global event_listener_task
+
     try:
         # Get balance in Wei
         balance_wei = web3.eth.get_balance(eth_address)
@@ -114,6 +156,10 @@ async def check_balance(ctx: Context):
         if contract:
             ctx.logger.info(f"ConsultationEscrow Contract: {CONTRACT_ADDRESS}")
             ctx.logger.info(f"Contract loaded successfully")
+
+            # Start the event listener in the background
+            event_listener_task = asyncio.create_task(listen_for_session_created_events(ctx))
+            ctx.logger.info("SessionCreated event listener started")
         else:
             ctx.logger.warning("Contract not loaded. Please deploy contracts.")
 

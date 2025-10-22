@@ -10,7 +10,7 @@ const ArbiDeploy = buildModule("SepoliaTestnet", (m) => {
 // ARBI SEPOLIA..
 const PYUSD = "0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9"
 const PythOracle = "0x4374e5a8b9C22271E9EB878A2AA31DE97DF15DAF"
-const USDC = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
+const USDC = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"
 
 const USDT = m.contract("MockERC20",["USDT", "USDT"])
 const PYTHORACLE = m.contract("PythPriceConsumer",[PythOracle])

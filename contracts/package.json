@@ -2,6 +2,10 @@
   "name": "pluseBridge-solidity",
   "version": "1.0.0",
   "type": "module",
+  "scripts": {
+    "deploy:localhost": "USE_MOCKS=true hardhat run scripts/deploy.ts --network localhost",
+    "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia"
+  },
   "devDependencies": {
     "@nomicfoundation/hardhat-ignition": "^3.0.3",
     "@nomicfoundation/hardhat-toolbox-viem": "^5.0.0",

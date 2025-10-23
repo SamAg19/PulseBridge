@@ -1,18 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
+import { createTask, getTasksByDoctor } from '@/lib/firebase/firestore';
 
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
     const taskData = {
       ...data,
-      currency: 'PYUSD',
-      status: 'draft',
-      createdAt: serverTimestamp(),
+      currency: 'PYUSD' as const,
+      status: 'draft' as const,
     };
-    const docRef = await addDoc(collection(db, 'tasks'), taskData);
-    return NextResponse.json({ success: true, taskId: docRef.id });
+    const result = await createTask(taskData);
+    return NextResponse.json(result);
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const doctorId = searchParams.get('doctorId');
+    
+    if (!doctorId) {
+      return NextResponse.json({ error: 'Doctor ID required' }, { status: 400 });
+    }
+    
+    const tasks = await getTasksByDoctor(doctorId);
+    return NextResponse.json({ tasks });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

@@ -155,7 +155,7 @@ export default function SignUpPage() {
                 <button
                   type="button"
                   onClick={nextStep}
-                  className="w-full bg-white bg-opacity-20 hover:bg-opacity-30 text-white font-semibold py-4 rounded-xl transition-all duration-300 backdrop-blur-sm border border-white border-opacity-30 hover:border-opacity-50 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
+                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
                 >
                   Continue
                 </button>
@@ -243,14 +243,14 @@ export default function SignUpPage() {
                   <button
                     type="button"
                     onClick={prevStep}
-                    className="flex-1 bg-white bg-opacity-10 hover:bg-opacity-20 text-white font-semibold py-4 rounded-xl transition-all duration-300 backdrop-blur-sm border border-white border-opacity-30 hover:border-opacity-50 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
+                    className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-4 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
                   >
                     Back
                   </button>
                   <button
                     type="submit"
                     disabled={loading}
-                    className="flex-1 bg-white bg-opacity-20 hover:bg-opacity-30 text-white font-semibold py-4 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm border border-white border-opacity-30 hover:border-opacity-50 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
+                    className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
                   >
                     {loading ? (
                       <div className="flex items-center justify-center">

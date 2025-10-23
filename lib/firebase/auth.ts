@@ -1,34 +1,46 @@
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from './config';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from './config';
 import { DoctorProfile } from '../types';
 
-export const registerDoctor = async (email: string, password: string, doctorData: Omit<DoctorProfile, 'verificationStatus' | 'createdAt' | 'updatedAt' | 'email'>) => {
+export const registerDoctorWithWallet = async (
+  walletAddress: string, 
+  doctorData: Omit<DoctorProfile, 'verificationStatus' | 'createdAt' | 'updatedAt' | 'walletAddress'>
+) => {
   try {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const doctorDoc: DoctorProfile = {
-      email,
+    const doctorDoc: DoctorProfile & { walletAddress: string } = {
+      walletAddress,
       ...doctorData,
       verificationStatus: 'pending',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
-    await setDoc(doc(db, 'doctors', userCredential.user.uid), doctorDoc);
-    return { success: true, userId: userCredential.user.uid };
+    await setDoc(doc(db, 'doctors', walletAddress), doctorDoc);
+    return { success: true, doctorId: walletAddress };
   } catch (error: any) {
     throw new Error(`Registration failed: ${error.message}`);
   }
 };
 
-export const loginDoctor = async (email: string, password: string) => {
+export const checkDoctorRegistration = async (walletAddress: string) => {
   try {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    return { success: true, user: userCredential.user };
+    const docSnap = await getDoc(doc(db, 'doctors', walletAddress));
+    if (docSnap.exists()) {
+      return { id: docSnap.id, ...docSnap.data() };
+    }
+    return null;
   } catch (error: any) {
-    throw new Error(`Login failed: ${error.message}`);
+    throw new Error(`Failed to check registration: ${error.message}`);
   }
 };
 
-export const logoutDoctor = async () => {
-  await signOut(auth);
+export const getDoctorByWallet = async (walletAddress: string) => {
+  try {
+    const docSnap = await getDoc(doc(db, 'doctors', walletAddress));
+    if (docSnap.exists()) {
+      return { id: docSnap.id, ...docSnap.data() };
+    }
+    throw new Error('Doctor not found');
+  } catch (error: any) {
+    throw new Error(`Failed to fetch doctor: ${error.message}`);
+  }
 };

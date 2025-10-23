@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
+import { updatePaymentStatus } from '@/lib/firebase/firestore';
 
 export async function POST(req: NextRequest) {
   try {
     const { paymentId, approverUserId } = await req.json();
-    await updateDoc(doc(db, 'payments', paymentId), {
-      status: 'approved',
-      approvedBy: approverUserId,
-      approvedAt: serverTimestamp(),
+    const result = await updatePaymentStatus(paymentId, 'approved', approverUserId);
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Payment approved successfully' 
     });
-    return NextResponse.json({ success: true, message: 'Payment approved successfully' });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

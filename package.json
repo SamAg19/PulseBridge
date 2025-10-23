@@ -11,7 +11,10 @@
   "dependencies": {
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "next": "16.0.0"
+    "next": "16.0.0",
+    "firebase": "^11.0.2",
+    "@solana/web3.js": "^1.95.8",
+    "@solana/spl-token": "^0.4.9"
   },
   "devDependencies": {
     "typescript": "^5",

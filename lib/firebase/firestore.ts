@@ -163,6 +163,35 @@ export const updatePaymentStatus = async (
   }
 };
 
+// ============ DOCTOR VERIFICATION ============
+export const updateDoctorVerificationStatus = async (
+  doctorId: string, 
+  status: 'pending' | 'approved' | 'rejected'
+) => {
+  try {
+    await updateDoc(doc(db, 'doctors', doctorId), {
+      verificationStatus: status,
+      verifiedAt: status === 'approved' ? serverTimestamp() : null,
+      updatedAt: serverTimestamp(),
+    });
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(`Failed to update verification status: ${error.message}`);
+  }
+};
+
+export const getAllDoctors = async () => {
+  try {
+    const querySnapshot = await getDocs(collection(db, 'doctors'));
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error: any) {
+    throw new Error(`Failed to fetch doctors: ${error.message}`);
+  }
+};
+
 // ============ DOCTOR PROFILE ============
 export const updateDoctorProfile = async (doctorId: string, updates: any) => {
   try {

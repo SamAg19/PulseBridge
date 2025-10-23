@@ -4,6 +4,7 @@ export interface DoctorProfile {
   specialization: string;
   licenseNumber: string;
   verificationStatus: 'pending' | 'approved' | 'rejected';
+  walletAddress?: string;
   createdAt: any;
   updatedAt: any;
 }

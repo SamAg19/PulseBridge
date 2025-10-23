@@ -21,11 +21,16 @@ export const registerDoctorWithWallet = async (
   }
 };
 
-export const checkDoctorRegistration = async (walletAddress: string) => {
+export const checkDoctorRegistration = async (walletAddress: string): Promise<(DoctorProfile & { id: string; walletAddress: string }) | null> => {
   try {
     const docSnap = await getDoc(doc(db, 'doctors', walletAddress));
     if (docSnap.exists()) {
-      return { id: docSnap.id, ...docSnap.data() };
+      const data = docSnap.data();
+      return { 
+        id: docSnap.id, 
+        ...data,
+        walletAddress: data.walletAddress || walletAddress
+      } as DoctorProfile & { id: string; walletAddress: string };
     }
     return null;
   } catch (error: any) {
@@ -33,11 +38,16 @@ export const checkDoctorRegistration = async (walletAddress: string) => {
   }
 };
 
-export const getDoctorByWallet = async (walletAddress: string) => {
+export const getDoctorByWallet = async (walletAddress: string): Promise<DoctorProfile & { id: string; walletAddress: string }> => {
   try {
     const docSnap = await getDoc(doc(db, 'doctors', walletAddress));
     if (docSnap.exists()) {
-      return { id: docSnap.id, ...docSnap.data() };
+      const data = docSnap.data();
+      return { 
+        id: docSnap.id, 
+        ...data,
+        walletAddress: data.walletAddress || walletAddress
+      } as DoctorProfile & { id: string; walletAddress: string };
     }
     throw new Error('Doctor not found');
   } catch (error: any) {

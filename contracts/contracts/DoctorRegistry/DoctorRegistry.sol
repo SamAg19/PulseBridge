@@ -17,7 +17,7 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
     uint256 public depositFee;
     uint256 public stakeAmount;
     uint256 public totalPYUsdToBeCollected;
-    uint32 numDoctors;
+    uint32 public numDoctors;
     bytes32 public constant APPROVER = keccak256("APPROVER");
 
     event PendingRegistration(uint32 docID);

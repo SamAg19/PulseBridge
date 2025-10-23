@@ -29,13 +29,10 @@ const config: HardhatUserConfig = {
 
 
   networks: {
-    hardhatMainnet: {
-      type: "edr-simulated",
+    localhost: {
+      type: "http",
       chainType: "l1",
-    },
-    hardhatOp: {
-      type: "edr-simulated",
-      chainType: "op",
+      url: "http://127.0.0.1:8545",
     },
     sepolia: {
       type: "http",

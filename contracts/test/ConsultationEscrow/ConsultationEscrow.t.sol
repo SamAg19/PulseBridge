@@ -26,6 +26,9 @@ contract ConsultationEscrowTest is Test {
     uint256 depositFee = 1e6;
     uint256 stakeAmount = 5e6;
 
+    string profileDescription = "Experienced mental health therapist specializing in cognitive behavioral therapy and mindfulness techniques.";
+    string email = "alice@example.com";
+
     function setUp() public {
         vm.startPrank(admin);
         PYUSD = new MockERC20("PayPal USD", "pyUSD");
@@ -54,7 +57,7 @@ contract ConsultationEscrowTest is Test {
         PYUSD.faucet(10e6);
 
         PYUSD.approve(address(DocReg), stakeAmount);
-        DocReg.registerAsDoctor("Alice", "Mental-Health-Therapy", consultationFeePerHour, bytes32(uint256(123)));
+        DocReg.registerAsDoctor("Alice", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, bytes32(uint256(123)));
 
         vm.startPrank(admin);
         DocReg.grantRole(keccak256("APPROVER"), admin);
@@ -68,7 +71,7 @@ contract ConsultationEscrowTest is Test {
         PYUSD.faucet(10e6);
 
         PYUSD.approve(address(DocReg), stakeAmount);
-        DocReg.registerAsDoctor("Alice", "Mental-Health-Therapy", consultationFeePerHour, bytes32(uint256(123)));
+        DocReg.registerAsDoctor("Alice", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, bytes32(uint256(123)));
 
         vm.startPrank(admin);
         DocReg.grantRole(keccak256("APPROVER"), admin);

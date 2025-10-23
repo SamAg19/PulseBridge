@@ -44,6 +44,8 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
     function registerAsDoctor(
         string calldata name, 
         string calldata specialization, 
+        string calldata profileDescription,
+        string calldata email,
         uint256 consultationFees,
         bytes32 legalDocumentsIPFSHash
     ) public {
@@ -53,6 +55,8 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
         PendingRegistry[numDoctors] = Structs.RegStruct({
             Name: name,
             specialization: specialization,
+            profileDescription: profileDescription,
+            email: email,
             doctorAddress: msg.sender,
             consultationFeePerHour: consultationFees,
             depositFeeStored: depositFee,

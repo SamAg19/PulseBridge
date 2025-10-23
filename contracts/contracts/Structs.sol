@@ -6,6 +6,8 @@ library Structs {
     struct RegStruct {
         string Name;
         string specialization;
+        string profileDescription;
+        string email;
         address doctorAddress;
         uint256 consultationFeePerHour;
         uint256 depositFeeStored;

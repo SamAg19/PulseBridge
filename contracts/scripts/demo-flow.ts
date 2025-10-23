@@ -154,17 +154,21 @@ console.log("✓ Approval granted");
 // Register as doctor
 const doctorName = "Dr. Sarah Johnson";
 const specialization = "Cardiologist";
+const profileDescription = "Experienced cardiologist specializing in heart health and preventive care.";
+const email = "sarah.johnson@example.com";
 const consultationFeePerHour = parseUnits("50", 6); // $50 per hour
 const legalDocumentsIPFSHash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
 
 console.log("\nRegistering doctor with details:");
 console.log(`  Name: ${doctorName}`);
 console.log(`  Specialization: ${specialization}`);
+console.log(`  Profile Description: ${profileDescription}`);
+console.log(`  Email: ${email}`);
 console.log(`  Consultation Fee: ${formatUnits(consultationFeePerHour, 6)} PYUSD/hour`);
 console.log(`  Legal Documents IPFS: ${legalDocumentsIPFSHash}`);
 
 const registerTxHash = await doctorRegistryContract.write.registerAsDoctor(
-  [doctorName, specialization, consultationFeePerHour, legalDocumentsIPFSHash],
+  [doctorName, specialization, profileDescription, email, consultationFeePerHour, legalDocumentsIPFSHash],
   { account: doctor.account }
 );
 

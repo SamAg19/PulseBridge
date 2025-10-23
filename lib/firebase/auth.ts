@@ -3,10 +3,11 @@ import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from './config';
 import { DoctorProfile } from '../types';
 
-export const registerDoctor = async (email: string, password: string, doctorData: Omit<DoctorProfile, 'verificationStatus' | 'createdAt' | 'updatedAt'>) => {
+export const registerDoctor = async (email: string, password: string, doctorData: Omit<DoctorProfile, 'verificationStatus' | 'createdAt' | 'updatedAt' | 'email'>) => {
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const doctorDoc: DoctorProfile = {
+      email,
       ...doctorData,
       verificationStatus: 'pending',
       createdAt: serverTimestamp(),

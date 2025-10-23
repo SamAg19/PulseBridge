@@ -36,25 +36,15 @@ export default function HomePage() {
           </div>
 
           <div className="bg-white rounded-lg shadow-lg p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Features</h2>
-            <ul className="space-y-3 text-gray-600">
-              <li className="flex items-start">
-                <span className="text-green-500 mr-2">✓</span>
-                Verified doctor profiles
-              </li>
-              <li className="flex items-start">
-                <span className="text-green-500 mr-2">✓</span>
-                Flexible appointment scheduling
-              </li>
-              <li className="flex items-start">
-                <span className="text-green-500 mr-2">✓</span>
-                Secure PYUSD payments on Solana
-              </li>
-              <li className="flex items-start">
-                <span className="text-green-500 mr-2">✓</span>
-                Payment approval workflow
-              </li>
-            </ul>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">For Patients</h2>
+            <p className="text-gray-600 mb-6">
+              Book appointments with verified doctors and pay securely
+            </p>
+            <div className="space-y-3">
+              <button className="block w-full bg-gray-100 text-gray-500 text-center py-3 rounded-lg cursor-not-allowed">
+                Coming Soon
+              </button>
+            </div>
           </div>
         </div>
       </div>

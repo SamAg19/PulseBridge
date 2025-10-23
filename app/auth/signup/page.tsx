@@ -23,8 +23,8 @@ export default function SignUpPage() {
     setLoading(true);
 
     try {
-      const { email, password, ...doctorData } = formData;
-      await registerDoctor(email, password, doctorData);
+      const { password, ...doctorData } = formData;
+      await registerDoctor(formData.email, password, doctorData);
       router.push('/dashboard');
     } catch (err: any) {
       setError(err.message);

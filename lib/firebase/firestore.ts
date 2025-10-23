@@ -1,15 +1,15 @@
-import { 
-  collection, 
-  doc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  getDoc, 
-  getDocs, 
-  query, 
-  where, 
-  orderBy, 
-  serverTimestamp 
+import {
+  collection,
+  doc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  getDoc,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  serverTimestamp
 } from 'firebase/firestore';
 import { db } from './config';
 import { Task, Appointment, Payment } from '../types';
@@ -31,14 +31,22 @@ export const getTasksByDoctor = async (doctorId: string) => {
   try {
     const q = query(
       collection(db, 'tasks'),
-      where('doctorId', '==', doctorId),
-      orderBy('createdAt', 'desc')
+      where('doctorId', '==', doctorId)
     );
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
+    let tasks = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
+
+    // Sort in memory instead of using Firestore orderBy
+    tasks = tasks.sort((a: any, b: any) => {
+      const aTime = a.createdAt?.toDate?.() || new Date(0);
+      const bTime = b.createdAt?.toDate?.() || new Date(0);
+      return bTime.getTime() - aTime.getTime(); // Descending order
+    });
+
+    return tasks;
   } catch (error: any) {
     throw new Error(`Failed to fetch tasks: ${error.message}`);
   }
@@ -96,7 +104,7 @@ export const getAppointmentsByDoctor = async (doctorId: string) => {
 };
 
 export const updateAppointmentStatus = async (
-  appointmentId: string, 
+  appointmentId: string,
   status: Appointment['status']
 ) => {
   try {
@@ -141,7 +149,7 @@ export const getPaymentsByDoctor = async (doctorId: string) => {
 };
 
 export const updatePaymentStatus = async (
-  paymentId: string, 
+  paymentId: string,
   status: Payment['status'],
   approverUserId?: string
 ) => {
@@ -150,12 +158,12 @@ export const updatePaymentStatus = async (
       status,
       updatedAt: serverTimestamp(),
     };
-    
+
     if (status === 'approved' && approverUserId) {
       updates.approvedBy = approverUserId;
       updates.approvedAt = serverTimestamp();
     }
-    
+
     await updateDoc(doc(db, 'payments', paymentId), updates);
     return { success: true };
   } catch (error: any) {
@@ -165,7 +173,7 @@ export const updatePaymentStatus = async (
 
 // ============ DOCTOR VERIFICATION ============
 export const updateDoctorVerificationStatus = async (
-  doctorId: string, 
+  doctorId: string,
   status: 'pending' | 'approved' | 'rejected'
 ) => {
   try {

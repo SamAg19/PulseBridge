@@ -1,40 +1,48 @@
-import { Connection, PublicKey, Transaction } from '@solana/web3.js';
-import { getAssociatedTokenAddress, createTransferInstruction } from '@solana/spl-token';
+// PYUSD Payment Service - Placeholder for future implementation
+// No Solana dependencies required for now
 
-const PYUSD_MINT_ADDRESS = new PublicKey('2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo');
+export interface PaymentRequest {
+  appointmentId: string;
+  amount: number;
+  doctorWalletAddress: string;
+}
+
+export interface PaymentResult {
+  success: boolean;
+  transactionHash?: string;
+  error?: string;
+}
 
 export class PYUSDPaymentService {
-  private connection: Connection;
-
-  constructor(rpcUrl: string) {
-    this.connection = new Connection(rpcUrl);
-  }
-
-  async createPaymentRequest(appointmentId: string, amount: number, doctorWalletAddress: string) {
-    const paymentData = {
+  async createPaymentRequest(
+    appointmentId: string, 
+    amount: number, 
+    doctorWalletAddress: string
+  ): Promise<PaymentRequest> {
+    // Placeholder implementation - no actual blockchain interaction
+    const paymentData: PaymentRequest = {
       appointmentId,
       amount,
-      currency: 'PYUSD' as const,
-      status: 'pending_approval' as const,
-      approvalRequired: true,
       doctorWalletAddress,
-      createdAt: new Date(),
     };
+    
+    console.log('PYUSD Payment Request Created (Mock):', paymentData);
     return paymentData;
   }
 
-  async processApprovedPayment(fromWallet: PublicKey, toWallet: PublicKey, amount: number) {
-    const fromTokenAccount = await getAssociatedTokenAddress(PYUSD_MINT_ADDRESS, fromWallet);
-    const toTokenAccount = await getAssociatedTokenAddress(PYUSD_MINT_ADDRESS, toWallet);
-
-    const transaction = new Transaction().add(
-      createTransferInstruction(
-        fromTokenAccount,
-        toTokenAccount,
-        fromWallet,
-        amount * 1e6
-      )
-    );
-    return transaction;
+  async processPayment(paymentRequest: PaymentRequest): Promise<PaymentResult> {
+    // Placeholder implementation - simulate successful payment
+    console.log('Processing PYUSD payment (Mock):', paymentRequest);
+    
+    // Simulate processing delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    return {
+      success: true,
+      transactionHash: `mock_tx_${Date.now()}_${Math.random().toString(36).substring(7)}`
+    };
   }
 }
+
+// Export a default instance
+export const pyusdService = new PYUSDPaymentService();

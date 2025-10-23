@@ -21,7 +21,8 @@ contract DoctorRegistryTest is Test {
     bytes32 validDocIPFSHash = keccak256(abi.encodePacked("validDocumentsHash"));
     bytes32 invalidDocIPFSHash = keccak256(abi.encodePacked("invalidDocumentsHash"));
 
-    string profileDescription = "Experienced mental health therapist specializing in cognitive behavioral therapy and mindfulness techniques.";
+    string profileDescription =
+        "Experienced mental health therapist specializing in cognitive behavioral therapy and mindfulness techniques.";
     string email = "alice@example.com";
 
     function setUp() public {
@@ -39,7 +40,9 @@ contract DoctorRegistryTest is Test {
     modifier registration() {
         vm.startPrank(alice);
         PYUSD.approve(address(DocReg), stakeAmount);
-        DocReg.registerAsDoctor("Plairfx", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, invalidDocIPFSHash);
+        DocReg.registerAsDoctor(
+            "Alice", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, invalidDocIPFSHash
+        );
         _;
     }
 
@@ -51,12 +54,23 @@ contract DoctorRegistryTest is Test {
         vm.startPrank(alice);
         PYUSD.approve(address(DocReg), currentStakeAmount);
         vm.expectRevert("Legal documents IPFS hash is required!");
-        DocReg.registerAsDoctor("Plairfx", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, bytes32(0));
+        DocReg.registerAsDoctor(
+            "Alice", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, bytes32(0)
+        );
 
-        DocReg.registerAsDoctor("Plairfx", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, validDocIPFSHash);
+        DocReg.registerAsDoctor(
+            "Alice", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, validDocIPFSHash
+        );
 
         Structs.RegStruct memory ExpectedReturn = Structs.RegStruct(
-            "Plairfx", "Mental-Health-Therapy", profileDescription, email, alice, consultationFeePerHour, depositFee, validDocIPFSHash
+            "Alice",
+            "Mental-Health-Therapy",
+            profileDescription,
+            email,
+            alice,
+            consultationFeePerHour,
+            depositFee,
+            validDocIPFSHash
         );
 
         assertEq(keccak256(abi.encode(ExpectedReturn)), keccak256(abi.encode(DocReg.getPendingDoctor(1))));
@@ -75,7 +89,9 @@ contract DoctorRegistryTest is Test {
         DocReg.approveDoctor(1);
 
         PYUSD.approve(address(DocReg), currentStakeAmount);
-        DocReg.registerAsDoctor("Plairfx", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, validDocIPFSHash);
+        DocReg.registerAsDoctor(
+            "Alice", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, validDocIPFSHash
+        );
 
         vm.startPrank(approver);
         vm.expectEmit(true, true, true, true);
@@ -84,10 +100,18 @@ contract DoctorRegistryTest is Test {
         DocReg.approveDoctor(1);
 
         Structs.RegStruct memory ExpectedReturn = Structs.RegStruct(
-            "Plairfx", "Mental-Health-Therapy", profileDescription, email, alice, consultationFeePerHour, depositFee, validDocIPFSHash
+            "Alice",
+            "Mental-Health-Therapy",
+            profileDescription,
+            email,
+            alice,
+            consultationFeePerHour,
+            depositFee,
+            validDocIPFSHash
         );
 
         assertEq(keccak256(abi.encode(ExpectedReturn)), keccak256(abi.encode(DocReg.getDoctor(1))));
+        assertEq(DocReg.getDoctorID(alice), 1);
         uint256 balanceAfter = PYUSD.balanceOf(alice);
 
         assertEq(balanceBefore - DocReg.depositFee(), balanceAfter);
@@ -108,7 +132,14 @@ contract DoctorRegistryTest is Test {
         DocReg.denyDoctor(1);
 
         Structs.RegStruct memory ExpectedReturn = Structs.RegStruct(
-            "Plairfx", "Mental-Health-Therapy", profileDescription, email, alice, consultationFeePerHour, depositFee, invalidDocIPFSHash
+            "Alice",
+            "Mental-Health-Therapy",
+            profileDescription,
+            email,
+            alice,
+            consultationFeePerHour,
+            depositFee,
+            invalidDocIPFSHash
         );
 
         uint256 balanceAfter = PYUSD.balanceOf(alice);

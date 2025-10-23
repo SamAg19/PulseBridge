@@ -12,6 +12,7 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
 
     mapping(uint32 => Structs.RegStruct) ApprovedRegistry;
     mapping(uint256 => Structs.RegStruct) PendingRegistry;
+    mapping(address => uint32 docID) RegisteredDoctor;
 
     address public depositToken;
     uint256 public depositFee;
@@ -42,8 +43,8 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
      * required for the registration process.
      */
     function registerAsDoctor(
-        string calldata name, 
-        string calldata specialization, 
+        string calldata name,
+        string calldata specialization,
         string calldata profileDescription,
         string calldata email,
         uint256 consultationFees,
@@ -76,6 +77,7 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
     function approveDoctor(uint32 _docID) public onlyRole(APPROVER) {
         Structs.RegStruct memory Docreg = getPendingDoctor(_docID);
         ApprovedRegistry[_docID] = Docreg;
+        RegisteredDoctor[Docreg.doctorAddress] = _docID;
         IERC20(depositToken).transfer(Docreg.doctorAddress, stakeAmount - Docreg.depositFeeStored);
         emit DoctorApproved(numDoctors);
     }
@@ -115,6 +117,14 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
      */
     function getDoctor(uint32 _docID) public view returns (Structs.RegStruct memory DS) {
         return ApprovedRegistry[_docID];
+    }
+
+    /**
+     * @notice get a doctorID by their address
+     * @param _doctorAddress the  specific address you want the ID from.
+     */
+    function getDoctorID(address _doctorAddress) public view returns (uint32) {
+        return RegisteredDoctor[_doctorAddress];
     }
 
     /**

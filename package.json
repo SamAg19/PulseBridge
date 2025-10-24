@@ -14,6 +14,7 @@
     "firebase": "^11.10.0",
     "lucide-react": "^0.547.0",
     "next": "16.0.0",
+    "pinata": "^2.5.1",
     "rainbowkit": "^0.0.1",
     "react": "19.2.0",
     "react-dom": "19.2.0",

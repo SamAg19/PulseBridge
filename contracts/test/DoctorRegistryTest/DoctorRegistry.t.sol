@@ -18,8 +18,8 @@ contract DoctorRegistryTest is Test {
     uint256 stakeAmount = 5e6;
     uint256 depositFee = 1e6;
 
-    bytes32 validDocIPFSHash = keccak256(abi.encodePacked("validDocumentsHash"));
-    bytes32 invalidDocIPFSHash = keccak256(abi.encodePacked("invalidDocumentsHash"));
+    string validDocIPFSHash = "validDocumentsHash";
+    string invalidDocIPFSHash = " ";
 
     string profileDescription =
         "Experienced mental health therapist specializing in cognitive behavioral therapy and mindfulness techniques.";
@@ -55,7 +55,7 @@ contract DoctorRegistryTest is Test {
         PYUSD.approve(address(DocReg), currentStakeAmount);
         vm.expectRevert("Legal documents IPFS hash is required!");
         DocReg.registerAsDoctor(
-            "Alice", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, bytes32(0)
+            "Alice", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, ""
         );
 
         DocReg.registerAsDoctor(

@@ -20,6 +20,7 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
     uint256 public totalPYUsdToBeCollected;
     uint32 public numDoctors;
     bytes32 public constant APPROVER = keccak256("APPROVER");
+    bytes32 public constant EMPTY_STRING_HASH = keccak256(abi.encodePacked(""));
 
     event PendingRegistration(uint32 docID);
     event DepositFeeChanged(uint256 oldFee, uint256 newFee);
@@ -48,9 +49,9 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
         string calldata profileDescription,
         string calldata email,
         uint256 consultationFees,
-        bytes32 legalDocumentsIPFSHash
+        string calldata legalDocumentsIPFSHash
     ) public {
-        require(legalDocumentsIPFSHash != bytes32(0), "Legal documents IPFS hash is required!");
+        require(keccak256(abi.encodePacked(legalDocumentsIPFSHash)) != EMPTY_STRING_HASH, "Legal documents IPFS hash is required!");
 
         numDoctors++;
         PendingRegistry[numDoctors] = Structs.RegStruct({

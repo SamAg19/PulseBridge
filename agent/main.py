@@ -83,7 +83,19 @@ async def startup_event():
         logger.error(f"MeTTa initialization failed: {e}")
         logger.warning("System will continue with reduced functionality")
 
-    # TODO: Setup ASI:One client (Phase 6)
+    # Initialize ASI:One client (Phase 6)
+    try:
+        from services.asione_client import get_asione_client
+        asione = get_asione_client()
+        if asione.enabled:
+            logger.info("ASI:One client initialized")
+            logger.info("Natural language enhancement enabled")
+        else:
+            logger.warning("ASI:One API key not configured - AI enhancements disabled")
+    except Exception as e:
+        logger.error(f"ASI:One initialization failed: {e}")
+        logger.warning("System will continue without ASI:One enhancements")
+
     # TODO: Add Neurology and Dermatology agents (Phase 8)
 
     logger.info("=" * 60)

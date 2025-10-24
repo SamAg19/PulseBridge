@@ -15,6 +15,7 @@ from datetime import datetime
 import time
 import logging
 from services.doctor_matcher import get_doctor_matcher
+from services.asione_client import get_asione_client
 from agents.cardiology_agent import get_cardiology_agent
 from agents.triage_agent import get_triage_agent
 
@@ -139,16 +140,46 @@ async def analyze_symptoms(request: SymptomAnalysisRequest):
 
         logger.info(f"Found {len(matching_doctors)} doctors for {specialty_search}")
 
+        asione_client = get_asione_client()
+        asi_one_used = False
+
         # Generate preliminary diagnosis from specialist analysis
         preliminary_diagnosis = specialist_analysis.analysis
 
+        # Use ASI:One to create patient-friendly explanation (if enabled)
+        if asione_client.enabled:
+            patient_friendly_diagnosis = await asione_client.generate_patient_friendly_explanation(
+                technical_diagnosis=preliminary_diagnosis,
+                metta_reasoning=specialist_analysis.metta_reasoning.dict() if specialist_analysis.metta_reasoning else None,
+                recommendations=specialist_analysis.recommendations
+            )
+            # Use ASI:One version if different from original
+            if patient_friendly_diagnosis != preliminary_diagnosis:
+                preliminary_diagnosis = patient_friendly_diagnosis
+                asi_one_used = True
+                logger.info("ASI:One enhanced preliminary diagnosis")
+
         # Generate consensus reasoning showing multi-agent collaboration
-        consensus_reasoning = f"Multi-agent collaboration: Triage agent (MeTTa routing: {triage_analysis.metta_reasoning.matched_rules if triage_analysis.metta_reasoning else 0} rules) "
-        consensus_reasoning += f"routed to {recommended_specialty.title()} with {triage_analysis.confidence_score:.0%} confidence. "
-        consensus_reasoning += f"\n\n{recommended_specialty.title()} specialist (MeTTa reasoning: {specialist_analysis.metta_reasoning.matched_rules if specialist_analysis.metta_reasoning else 0} rules) "
-        consensus_reasoning += f"identified {specialist_analysis.confidence_score:.0%} probability of condition requiring attention. "
-        consensus_reasoning += f"\n\nUrgency level: {specialist_analysis.risk_level}. "
-        consensus_reasoning += f"Consensus: Patient should consult {recommended_specialty.title()} specialist. {len(matching_doctors)} qualified specialists available."
+        technical_consensus = f"Multi-agent collaboration: Triage agent (MeTTa routing: {triage_analysis.metta_reasoning.matched_rules if triage_analysis.metta_reasoning else 0} rules) "
+        technical_consensus += f"routed to {recommended_specialty.title()} with {triage_analysis.confidence_score:.0%} confidence. "
+        technical_consensus += f"\n\n{recommended_specialty.title()} specialist (MeTTa reasoning: {specialist_analysis.metta_reasoning.matched_rules if specialist_analysis.metta_reasoning else 0} rules) "
+        technical_consensus += f"identified {specialist_analysis.confidence_score:.0%} probability of condition requiring attention. "
+        technical_consensus += f"\n\nUrgency level: {specialist_analysis.risk_level}. "
+        technical_consensus += f"Consensus: Patient should consult {recommended_specialty.title()} specialist. {len(matching_doctors)} qualified specialists available."
+
+        # Use ASI:One to enhance consensus reasoning (if enabled)
+        consensus_reasoning = technical_consensus
+        if asione_client.enabled:
+            enhanced_consensus = await asione_client.enhance_consensus_reasoning(
+                triage_analysis=triage_analysis.analysis,
+                specialist_analysis=specialist_analysis.analysis,
+                specialty=recommended_specialty.title(),
+                confidence=specialist_analysis.confidence_score
+            )
+            if enhanced_consensus != technical_consensus:
+                consensus_reasoning = enhanced_consensus
+                asi_one_used = True
+                logger.info("ASI:One enhanced consensus reasoning")
 
         # Build agent collaboration dict
         agent_collaboration = {
@@ -167,7 +198,7 @@ async def analyze_symptoms(request: SymptomAnalysisRequest):
             total_doctors_found=len(matching_doctors),
             analysis_timestamp=datetime.now().isoformat(),
             processing_time_ms=int((time.time() - start_time) * 1000),
-            asi_one_enhanced=False  # Will be True in Phase 6 when ASI:One is integrated
+            asi_one_enhanced=asi_one_used  # True when ASI:One successfully enhanced the response
         )
 
         return response

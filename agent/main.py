@@ -67,8 +67,18 @@ async def startup_event():
         logger.error(f"Blockchain initialization failed: {e}")
         logger.warning("System will continue but doctor queries may fail")
 
-    # TODO: Initialize MeTTa engine (Phase 3)
-    # TODO: Initialize agents (Phase 4-5)
+    # Initialize MeTTa engine and agents (Phase 3)
+    try:
+        from agents.cardiology_agent import get_cardiology_agent
+        cardiology = get_cardiology_agent()
+        logger.info("MeTTa reasoning engine initialized")
+        logger.info("Cardiology agent loaded (30+ medical rules)")
+        logger.info("Real MeTTa reasoning ready")
+    except Exception as e:
+        logger.error(f"MeTTa initialization failed: {e}")
+        logger.warning("System will continue with reduced functionality")
+
+    # TODO: Initialize Triage agent (Phase 4)
     # TODO: Setup ASI:One client (Phase 6)
 
     logger.info("=" * 60)

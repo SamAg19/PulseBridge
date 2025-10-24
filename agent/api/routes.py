@@ -15,6 +15,7 @@ from datetime import datetime
 import time
 import logging
 from services.doctor_matcher import get_doctor_matcher
+from agents.cardiology_agent import get_cardiology_agent
 
 logger = logging.getLogger(__name__)
 
@@ -91,9 +92,21 @@ async def analyze_symptoms(request: SymptomAnalysisRequest):
     start_time = time.time()
 
     try:
-        # Get recommended specialization (will be from MeTTa in later phases)
-        # For now, using "Cardiology" as default for mock response
-        recommended_specialization = "Cardiology"
+        # Phase 3: Use real MeTTa-powered Cardiology agent
+        cardiology_agent = get_cardiology_agent()
+
+        # Run Cardiology agent analysis with real MeTTa reasoning
+        cardiology_analysis = await cardiology_agent.analyze(
+            symptoms=request.symptoms,
+            patient_age=request.patient_age,
+            patient_gender=request.patient_gender,
+            medical_history=request.medical_history
+        )
+
+        logger.info(f"Cardiology agent completed analysis: {cardiology_analysis.confidence_score} confidence")
+
+        # Extract recommended specialization from analysis
+        recommended_specialization = "Cardiology"  # For now, always cardiology (will add triage agent in Phase 4)
 
         # Query real doctors from blockchain
         matcher = get_doctor_matcher()
@@ -101,65 +114,47 @@ async def analyze_symptoms(request: SymptomAnalysisRequest):
 
         logger.info(f"Found {len(matching_doctors)} doctors for {recommended_specialization}")
 
-        # MOCK RESPONSE FOR NOW - Will be replaced with real orchestrator
-        # This allows frontend to start integrating immediately
+        # Generate preliminary diagnosis from Cardiology analysis
+        preliminary_diagnosis = cardiology_analysis.analysis
 
-        mock_response = SymptomAnalysisResponse(
-            preliminary_diagnosis="Based on your symptoms of chest pain and shortness of breath, along with your medical history of hypertension and diabetes, there is a possibility of angina or other cardiac condition.",
-            recommended_specialization="Cardiology",
-            urgency_level="high",
-            overall_confidence=0.82,
+        # Create mock triage agent (will be real in Phase 4)
+        triage_analysis = AgentAnalysis(
+            agent_name="Triage Coordinator",
+            agent_role="triage",
+            analysis=f"Patient symptoms indicate potential cardiac issue. Routing to cardiology specialist for detailed assessment. {len(matching_doctors)} cardiologists available.",
+            confidence_score=0.75,
+            risk_level=cardiology_analysis.risk_level,
+            recommendations=[
+                "Route to cardiology specialist",
+                "Assess urgency level based on symptom severity"
+            ],
+            processing_time_ms=50
+        )
+
+        # Generate consensus reasoning
+        consensus_reasoning = f"After collaborative analysis, Cardiology specialist (MeTTa-powered) identified {cardiology_analysis.confidence_score:.0%} probability of {preliminary_diagnosis.split('suggest possible ')[1].split('.')[0] if 'suggest possible' in preliminary_diagnosis else 'cardiac condition'}. "
+        consensus_reasoning += f"MeTTa reasoning matched {cardiology_analysis.metta_reasoning.matched_rules if cardiology_analysis.metta_reasoning else 0} medical rules. "
+        consensus_reasoning += f"Urgency level: {cardiology_analysis.risk_level}. "
+        consensus_reasoning += f"Consensus: Primary concern is cardiovascular, requiring specialist consultation."
+
+        response = SymptomAnalysisResponse(
+            preliminary_diagnosis=preliminary_diagnosis,
+            recommended_specialization=recommended_specialization,
+            urgency_level=cardiology_analysis.risk_level,
+            overall_confidence=cardiology_analysis.confidence_score,
             agent_collaboration={
-                "triage": AgentAnalysis(
-                    agent_name="Triage Coordinator",
-                    agent_role="triage",
-                    analysis="Patient symptoms indicate potential cardiac issue. Multiple risk factors present including hypertension and diabetes. Routing to cardiology specialist for detailed assessment.",
-                    confidence_score=0.75,
-                    risk_level="high",
-                    recommendations=[
-                        "Route to cardiology specialist",
-                        "Assess urgency level",
-                        "Consider neurology consultation for dizziness"
-                    ],
-                    processing_time_ms=120
-                ),
-                "cardiology": AgentAnalysis(
-                    agent_name="Cardiology Specialist",
-                    agent_role="cardiology",
-                    analysis="Patient presents with chest pain that worsens with activity, combined with hypertension and diabetes. MeTTa reasoning indicates high probability (85%) of angina. Multiple cardiac risk factors identified. Urgent consultation recommended within 24 hours. EKG and stress test advised.",
-                    confidence_score=0.85,
-                    risk_level="high",
-                    recommendations=[
-                        "Urgent cardiology consultation within 24 hours",
-                        "EKG recommended",
-                        "Stress test advised",
-                        "Avoid strenuous activity until consultation",
-                        "Monitor symptoms closely"
-                    ],
-                    metta_reasoning=MeTTaReasoning(
-                        matched_rules=5,
-                        confidence_calculation="Base confidence 0.5 (chest pain match) + symptom pattern 0.2 (pain with activity) + risk factors 0.15 (HTN + diabetes)",
-                        risk_factors_identified=["hypertension", "diabetes", "age>40", "chest pain with exertion"],
-                        urgency_score=0.85,
-                        key_findings=[
-                            "Chest pain with exertional component",
-                            "Multiple cardiac risk factors",
-                            "Classic angina presentation",
-                            "High urgency score"
-                        ]
-                    ),
-                    processing_time_ms=450
-                )
+                "triage": triage_analysis,
+                "cardiology": cardiology_analysis  # Real MeTTa-powered analysis!
             },
-            consensus_reasoning="After collaborative analysis, Cardiology specialist identified 85% probability of cardiac condition. Triage assessment confirmed high priority routing. Consensus: Primary concern is cardiovascular, requiring urgent specialist consultation. Patient should be seen by cardiologist within 24 hours.",
+            consensus_reasoning=consensus_reasoning,
             available_doctors=matching_doctors,
             total_doctors_found=len(matching_doctors),
             analysis_timestamp=datetime.now().isoformat(),
             processing_time_ms=int((time.time() - start_time) * 1000),
-            asi_one_enhanced=True
+            asi_one_enhanced=False  # Will be True in Phase 6 when ASI:One is integrated
         )
 
-        return mock_response
+        return response
 
     except Exception as e:
         raise HTTPException(

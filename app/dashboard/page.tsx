@@ -1,14 +1,22 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAccount, useDisconnect } from 'wagmi';
+import ResponsiveLayout from '@/components/ResponsiveLayout';
+import { Plus, FileText, Calendar, CreditCard, Users, Clock, DollarSign, TrendingUp } from 'lucide-react';
 
 export default function DashboardPage() {
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const router = useRouter();
+  const [stats, setStats] = useState({
+    totalTasks: 0,
+    totalAppointments: 0,
+    pendingPayments: 0,
+    completedAppointments: 0
+  });
 
   useEffect(() => {
     if (!isConnected) {
@@ -23,101 +31,133 @@ export default function DashboardPage() {
 
   if (!isConnected) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-xl text-gray-600">Loading...</div>
+      <div className="min-h-screen bg-light-blue flex items-center justify-center p-4">
+        <div className="glass-card rounded-2xl p-6 sm:p-8 text-center max-w-md w-full border border-blue-200">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-secondary">Loading dashboard...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-light-blue">
-      <nav className="glass-card border-b border-blue-200">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-primary">Healthcare Platform</h1>
-          <button
-            onClick={handleLogout}
-            className="px-4 py-2 text-secondary hover:text-primary transition font-medium"
-          >
-            Logout
-          </button>
-        </div>
-      </nav>
-
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h2 className="text-4xl font-bold text-primary mb-2">Doctor Dashboard</h2>
-          <p className="text-secondary text-lg">Welcome back, {address?.slice(0, 6)}...{address?.slice(-4)}</p>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
-          <div className="glass-card rounded-xl p-6 border border-blue-200">
-            <h3 className="text-lg font-semibold text-primary mb-2">Total Tasks</h3>
-            <p className="text-3xl font-bold text-blue-600">0</p>
-          </div>
-          <div className="glass-card rounded-xl p-6 border border-blue-200">
-            <h3 className="text-lg font-semibold text-primary mb-2">Appointments</h3>
-            <p className="text-3xl font-bold text-blue-500">0</p>
-          </div>
-          <div className="glass-card rounded-xl p-6 border border-blue-200">
-            <h3 className="text-lg font-semibold text-primary mb-2">Pending Payments</h3>
-            <p className="text-3xl font-bold text-blue-400">0 PYUSD</p>
+    <ResponsiveLayout 
+      userType="doctor" 
+      title="Doctor Dashboard" 
+      subtitle={`Welcome back, Dr. ${address?.slice(0, 6)}...${address?.slice(-4)}`}
+    >
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="glass-card rounded-xl p-4 sm:p-6 border border-blue-200">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+              <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-semibold text-primary">Total Services</h3>
+              <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-blue-600">{stats.totalTasks}</p>
+            </div>
           </div>
         </div>
+        
+        <div className="glass-card rounded-xl p-4 sm:p-6 border border-blue-200">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-semibold text-primary">Appointments</h3>
+              <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-green-600">{stats.totalAppointments}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="glass-card rounded-xl p-4 sm:p-6 border border-blue-200">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+              <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-semibold text-primary">Pending Payments</h3>
+              <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-purple-600">{stats.pendingPayments}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="glass-card rounded-xl p-4 sm:p-6 border border-blue-200">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-semibold text-primary">Completed</h3>
+              <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-orange-600">{stats.completedAppointments}</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
+      {/* Quick Actions */}
+      <div>
+        <h2 className="text-xl sm:text-2xl font-bold text-primary mb-4 sm:mb-6">Quick Actions</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
           <Link
             href="/dashboard/tasks/create"
-            className="glass-card rounded-xl hover:shadow-xl transition-all duration-300 p-8 text-center transform hover:scale-105 border border-blue-200"
+            className="glass-card rounded-xl hover:shadow-xl transition-all duration-300 p-6 sm:p-8 text-center transform hover:scale-105 border border-blue-200 group"
           >
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-blue-200 transition-colors">
+              <Plus className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
             </div>
-            <h3 className="text-xl font-bold text-primary mb-2">Create New Task</h3>
-            <p className="text-secondary">Set up consultation, procedure, or follow-up tasks</p>
+            <h3 className="text-lg sm:text-xl font-bold text-primary mb-2">Create New Service</h3>
+            <p className="text-secondary text-sm sm:text-base">Set up consultation, procedure, or follow-up services</p>
           </Link>
 
           <Link
             href="/dashboard/tasks"
-            className="glass-card rounded-xl hover:shadow-xl transition-all duration-300 p-8 text-center transform hover:scale-105 border border-blue-200"
+            className="glass-card rounded-xl hover:shadow-xl transition-all duration-300 p-6 sm:p-8 text-center transform hover:scale-105 border border-blue-200 group"
           >
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-green-200 transition-colors">
+              <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
             </div>
-            <h3 className="text-xl font-bold text-primary mb-2">Manage Tasks</h3>
-            <p className="text-secondary">View and edit your existing tasks</p>
+            <h3 className="text-lg sm:text-xl font-bold text-primary mb-2">Manage Services</h3>
+            <p className="text-secondary text-sm sm:text-base">View and edit your existing services</p>
           </Link>
 
           <Link
             href="/dashboard/appointments"
-            className="glass-card rounded-xl hover:shadow-xl transition-all duration-300 p-8 text-center transform hover:scale-105 border border-blue-200"
+            className="glass-card rounded-xl hover:shadow-xl transition-all duration-300 p-6 sm:p-8 text-center transform hover:scale-105 border border-blue-200 group"
           >
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-purple-200 transition-colors">
+              <Calendar className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" />
             </div>
-            <h3 className="text-xl font-bold text-primary mb-2">Appointments</h3>
-            <p className="text-secondary">View scheduled appointments</p>
+            <h3 className="text-lg sm:text-xl font-bold text-primary mb-2">View Appointments</h3>
+            <p className="text-secondary text-sm sm:text-base">Manage your scheduled appointments</p>
           </Link>
 
           <Link
             href="/dashboard/payments"
-            className="glass-card rounded-xl hover:shadow-xl transition-all duration-300 p-8 text-center transform hover:scale-105 border border-blue-200"
+            className="glass-card rounded-xl hover:shadow-xl transition-all duration-300 p-6 sm:p-8 text-center transform hover:scale-105 border border-blue-200 group"
           >
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-              </svg>
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-orange-200 transition-colors">
+              <CreditCard className="w-6 h-6 sm:w-8 sm:h-8 text-orange-600" />
             </div>
-            <h3 className="text-xl font-bold text-primary mb-2">Payments</h3>
-            <p className="text-secondary">Manage crypto payments and approvals</p>
+            <h3 className="text-lg sm:text-xl font-bold text-primary mb-2">Payment Management</h3>
+            <p className="text-secondary text-sm sm:text-base">Track earnings and payment approvals</p>
           </Link>
         </div>
       </div>
-    </div>
+
+      {/* Recent Activity */}
+      <div>
+        <h2 className="text-xl sm:text-2xl font-bold text-primary mb-4 sm:mb-6">Recent Activity</h2>
+        <div className="glass-card rounded-xl p-4 sm:p-6 border border-blue-200">
+          <div className="text-center py-8 sm:py-12">
+            <Users className="w-12 h-12 sm:w-16 sm:h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-base sm:text-lg font-medium text-primary mb-2">No Recent Activity</h3>
+            <p className="text-secondary text-sm sm:text-base">Your recent appointments and activities will appear here</p>
+          </div>
+        </div>
+      </div>
+    </ResponsiveLayout>
   );
 }

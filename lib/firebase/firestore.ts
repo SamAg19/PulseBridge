@@ -266,7 +266,7 @@ export const getVerifiedDoctorsWithTasks = async (page: number = 1, limit: numbe
         })) as any[];
 
         // Calculate average rating
-        const avgRating = reviews.length > 0 
+        const avgRating = reviews.length > 0
           ? reviews.reduce((sum: number, review: any) => sum + review.rating, 0) / reviews.length
           : 0;
 
@@ -422,8 +422,8 @@ export const markParticipantJoined = async (
     };
 
     // Check if both participants are now present
-    const bothPresent = participantType === 'doctor' 
-      ? currentTracking.patientJoined 
+    const bothPresent = participantType === 'doctor'
+      ? currentTracking.patientJoined
       : currentTracking.doctorJoined;
 
     if (bothPresent) {
@@ -537,12 +537,18 @@ export const updateAppointmentMeetingLink = async (
   meetingId?: string
 ) => {
   try {
-    await updateDoc(doc(db, 'appointments', appointmentId), {
+    const updates: any = {
       meetingLink,
-      meetingId: meetingId || `meeting-${Date.now()}`,
-      status: 'confirmed',
       updatedAt: serverTimestamp(),
-    });
+    };
+
+    // Only add meetingId and update status if meetingId is provided
+    if (meetingId) {
+      updates.meetingId = meetingId;
+      updates.status = 'confirmed';
+    }
+
+    await updateDoc(doc(db, 'appointments', appointmentId), updates);
     return { success: true };
   } catch (error: any) {
     throw new Error(`Failed to update meeting link: ${error.message}`);
@@ -612,21 +618,21 @@ export const getPatientProfile = async (walletAddress: string): Promise<PatientP
   try {
     const docRef = doc(db, 'patients', walletAddress);
     const docSnap = await getDoc(docRef);
-    
+
     if (docSnap.exists()) {
       return {
         ...docSnap.data(),
         registrationDate: docSnap.data().registrationDate?.toDate() || new Date(),
       } as PatientProfile;
     }
-    
+
     // If not found by document ID, try querying by walletAddress field
     const q = query(
       collection(db, 'patients'),
       where('walletAddress', '==', walletAddress)
     );
     const querySnapshot = await getDocs(q);
-    
+
     if (!querySnapshot.empty) {
       const doc = querySnapshot.docs[0];
       return {
@@ -634,7 +640,7 @@ export const getPatientProfile = async (walletAddress: string): Promise<PatientP
         registrationDate: doc.data().registrationDate?.toDate() || new Date(),
       } as PatientProfile;
     }
-    
+
     return null;
   } catch (error: any) {
     console.error('Error fetching patient profile:', error);
@@ -663,3 +669,4 @@ export const checkPatientExists = async (walletAddress: string): Promise<boolean
     return false;
   }
 };
+

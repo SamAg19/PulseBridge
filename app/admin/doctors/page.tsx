@@ -40,21 +40,21 @@ export default function AdminDoctors() {
     }
   };
 
-  const handleVerificationUpdate = async (doctorId: string, status: 'approved' | 'rejected') => {
+  const handleVerificationUpdate = async (doctorId: string, status: 'pending' | 'approved' | 'rejected') => {
     try {
       setUpdatingDoctor(doctorId);
       await updateDoctorVerificationStatus(doctorId, status);
-      
+
       // Update local state
-      setDoctors(prevDoctors => 
-        prevDoctors.map(doctor => 
-          doctor.id === doctorId 
+      setDoctors(prevDoctors =>
+        prevDoctors.map(doctor =>
+          doctor.id === doctorId
             ? { ...doctor, verificationStatus: status }
             : doctor
         )
       );
-      
-      alert(`Doctor ${status === 'approved' ? 'approved' : 'rejected'} successfully!`);
+
+      alert(`Doctor ${status === 'approved' ? 'approved' : status === 'rejected' ? 'rejected' : 'reset to pending'} successfully!`);
     } catch (error) {
       console.error('Error updating verification status:', error);
       alert('Failed to update verification status. Please try again.');
@@ -63,7 +63,7 @@ export default function AdminDoctors() {
     }
   };
 
-  const filteredDoctors = doctors.filter(doctor => 
+  const filteredDoctors = doctors.filter(doctor =>
     filter === 'all' || doctor.verificationStatus === filter
   );
 
@@ -147,11 +147,10 @@ export default function AdminDoctors() {
                 <button
                   key={filterOption.key}
                   onClick={() => setFilter(filterOption.key as any)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                    filter === filterOption.key
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${filter === filterOption.key
                       ? 'bg-blue-600 text-white'
                       : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                  }`}
+                    }`}
                 >
                   {filterOption.label}
                 </button>
@@ -175,8 +174,8 @@ export default function AdminDoctors() {
                     {/* Doctor Avatar */}
                     <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-lg">
                       {doctor.profilePicture ? (
-                        <img 
-                          src={doctor.profilePicture} 
+                        <img
+                          src={doctor.profilePicture}
                           alt={doctor.fullName}
                           className="w-16 h-16 rounded-full object-cover"
                         />
@@ -191,25 +190,25 @@ export default function AdminDoctors() {
                         Dr. {doctor.fullName}
                       </h3>
                       <p className="text-blue-600 font-medium">{doctor.specialization}</p>
-                      
+
                       <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <div className="text-sm text-secondary mb-1">Email</div>
                           <div className="font-medium text-primary">{doctor.email}</div>
                         </div>
-                        
+
                         <div>
                           <div className="text-sm text-secondary mb-1">License Number</div>
                           <div className="font-medium text-primary">{doctor.licenseNumber}</div>
                         </div>
-                        
+
                         <div>
                           <div className="text-sm text-secondary mb-1">Experience</div>
                           <div className="font-medium text-primary">
                             {doctor.experience ? `${doctor.experience} years` : 'Not specified'}
                           </div>
                         </div>
-                        
+
                         <div>
                           <div className="text-sm text-secondary mb-1">Registration Date</div>
                           <div className="font-medium text-primary">{formatDate(doctor.createdAt)}</div>
@@ -275,8 +274,8 @@ export default function AdminDoctors() {
             </div>
             <h3 className="text-lg font-medium text-primary mb-2">No doctors found</h3>
             <p className="text-secondary">
-              {filter === 'all' 
-                ? "No doctors have registered yet." 
+              {filter === 'all'
+                ? "No doctors have registered yet."
                 : `No ${filter} doctors found.`
               }
             </p>

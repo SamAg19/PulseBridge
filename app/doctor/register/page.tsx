@@ -8,7 +8,7 @@ import { registerDoctorWithWallet, checkDoctorRegistration } from '@/lib/firebas
 import { DoctorProfile } from '@/lib/types';
 import { readContract } from "@wagmi/core"
 import { stringToHex, padHex, formatUnits } from 'viem'
-import { chains, DoctorRegistry, erc20Abi } from "@/constants"
+import { chains, DoctorRegistry, erc20Abi } from "@/lib/constants"
 
 
 export default function DoctorRegisterPage() {

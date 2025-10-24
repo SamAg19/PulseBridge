@@ -36,6 +36,115 @@ class ASIOneClient:
             self.enabled = True
             logger.info("ASI:One client initialized successfully")
 
+    async def preprocess_symptoms_for_metta(self, symptoms: str) -> Dict[str, any]:
+        """
+        Use ASI:One to preprocess and normalize symptoms for optimal MeTTa analysis
+
+        This preprocessing optimizes informal/messy patient input for MeTTa reasoning:
+        - Normalizes medical terminology
+        - Identifies temporal patterns (acute vs chronic)
+        - Extracts severity/quality descriptors
+        - Structures unstructured text
+
+        Args:
+            symptoms: Raw patient symptom description (potentially informal)
+
+        Returns:
+            Dict containing:
+            - preprocessed_text: Normalized medical description optimized for MeTTa
+            - key_symptoms: List of primary symptoms identified
+            - temporal_pattern: "acute", "chronic", "episodic", or None
+            - severity: "mild", "moderate", "severe", or None
+            - original_text: Original input for comparison
+        """
+        if not self.enabled:
+            return {
+                "preprocessed_text": symptoms,
+                "key_symptoms": [],
+                "temporal_pattern": None,
+                "severity": None,
+                "original_text": symptoms
+            }
+
+        try:
+            prompt = f"""You are a medical NLP system preprocessing patient symptoms for AI analysis. Transform informal patient descriptions into structured medical format.
+
+Patient input: "{symptoms}"
+
+Extract and normalize:
+1. Key symptoms (use medical terminology)
+2. Temporal pattern (acute/sudden, chronic/ongoing, episodic/intermittent)
+3. Severity indicators (mild, moderate, severe)
+4. Associated factors (exertional, positional, radiating, etc.)
+
+Output normalized medical description that preserves all important clinical details while using standard terminology.
+
+Respond in JSON:
+{{
+  "preprocessed_text": "normalized medical description using proper terminology",
+  "key_symptoms": ["symptom1", "symptom2"],
+  "temporal_pattern": "acute/chronic/episodic",
+  "severity": "mild/moderate/severe"
+}}"""
+
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    self.api_url,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": self.model,
+                        "messages": [
+                            {"role": "system", "content": "You are a medical NLP preprocessing system that normalizes patient descriptions for AI analysis."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "temperature": 0.2,  # Low temperature for consistency
+                        "max_tokens": 400
+                    }
+                )
+
+                if response.status_code == 200:
+                    result = response.json()
+                    content = result.get("choices", [{}])[0].get("message", {}).get("content", "{}")
+
+                    # Try to parse JSON from response
+                    import json
+                    try:
+                        parsed = json.loads(content)
+                        parsed["original_text"] = symptoms
+                        logger.info(f"ASI:One preprocessed symptoms: '{symptoms[:50]}...' → '{parsed.get('preprocessed_text', '')[:50]}...'")
+                        return parsed
+                    except json.JSONDecodeError:
+                        logger.warning("ASI:One preprocessing response not valid JSON")
+                        return {
+                            "preprocessed_text": symptoms,
+                            "key_symptoms": [],
+                            "temporal_pattern": None,
+                            "severity": None,
+                            "original_text": symptoms
+                        }
+                else:
+                    logger.error(f"ASI:One API error: {response.status_code}")
+                    return {
+                        "preprocessed_text": symptoms,
+                        "key_symptoms": [],
+                        "temporal_pattern": None,
+                        "severity": None,
+                        "original_text": symptoms
+                    }
+
+        except Exception as e:
+            logger.error(f"Error calling ASI:One preprocessing: {e}", exc_info=True)
+            return {
+                "preprocessed_text": symptoms,
+                "key_symptoms": [],
+                "temporal_pattern": None,
+                "severity": None,
+                "original_text": symptoms
+            }
+
     async def enhance_symptom_description(self, symptoms: str) -> Dict[str, any]:
         """
         Use ASI:One to extract medical entities and enhance symptom description
@@ -160,7 +269,7 @@ Respond in JSON format:
 1. Clear and easy to understand
 2. Reassuring but honest
 3. Action-oriented
-4. No medical jargon
+4. Uses proper medical specialty names (cardiologist, neurologist, dermatologist) NOT informal terms (heart doctor, brain doctor, skin doctor)
 
 Technical Diagnosis:
 {technical_diagnosis}
@@ -169,7 +278,7 @@ Technical Diagnosis:
 
 {recommendations_text}
 
-Create a brief, patient-friendly explanation (2-3 sentences) that helps the patient understand what's happening and what to do next."""
+Create a brief, patient-friendly explanation (2-3 sentences) that helps the patient understand what's happening and what to do next. Use proper medical terminology for specialist names."""
 
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
@@ -181,7 +290,7 @@ Create a brief, patient-friendly explanation (2-3 sentences) that helps the pati
                     json={
                         "model": self.model,
                         "messages": [
-                            {"role": "system", "content": "You are a compassionate medical AI assistant that explains medical information in simple, patient-friendly language."},
+                            {"role": "system", "content": "You are a compassionate medical AI assistant that explains medical information in simple, patient-friendly language. Always use proper medical specialty names like 'cardiologist', 'neurologist', 'dermatologist' instead of informal terms."},
                             {"role": "user", "content": prompt}
                         ],
                         "temperature": 0.7,
@@ -244,7 +353,7 @@ Create a concise 2-3 sentence summary that explains:
 2. The level of confidence
 3. The recommended next step
 
-Use natural, professional language."""
+Use natural, professional language with proper medical specialty names (cardiologist, neurologist, dermatologist)."""
 
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
@@ -256,7 +365,7 @@ Use natural, professional language."""
                     json={
                         "model": self.model,
                         "messages": [
-                            {"role": "system", "content": "You are a medical AI coordinator that synthesizes multiple AI analyses into coherent summaries."},
+                            {"role": "system", "content": "You are a medical AI coordinator that synthesizes multiple AI analyses into coherent summaries. Always use proper medical specialty names like 'cardiologist', 'neurologist', 'dermatologist'."},
                             {"role": "user", "content": prompt}
                         ],
                         "temperature": 0.6,

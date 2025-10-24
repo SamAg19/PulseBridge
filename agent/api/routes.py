@@ -94,12 +94,25 @@ async def analyze_symptoms(request: SymptomAnalysisRequest):
     start_time = time.time()
 
     try:
-        # Phase 4: Use real MeTTa-powered Triage agent for routing
+        # Phase 6: Step 0 - ASI:One preprocessing for optimal MeTTa analysis
+        asione_client = get_asione_client()
+        preprocessing_result = None
+        symptoms_for_analysis = request.symptoms
+
+        if asione_client.enabled:
+            preprocessing_result = await asione_client.preprocess_symptoms_for_metta(request.symptoms)
+            symptoms_for_analysis = preprocessing_result.get("preprocessed_text", request.symptoms)
+            logger.info(f"ASI:One preprocessing: {len(preprocessing_result.get('key_symptoms', []))} key symptoms identified")
+        else:
+            logger.debug("ASI:One preprocessing skipped (not enabled)")
+
+        # Phase 4: Step 1 - Use real MeTTa-powered Triage agent for routing
         triage_agent = get_triage_agent()
 
-        # Step 1: Triage agent routes symptoms to appropriate specialty
+        # Step 2: Triage agent routes symptoms to appropriate specialty
+        # Uses preprocessed symptoms for better accuracy
         triage_analysis, recommended_specialty = await triage_agent.analyze(
-            symptoms=request.symptoms,
+            symptoms=symptoms_for_analysis,
             patient_age=request.patient_age,
             patient_gender=request.patient_gender,
             medical_history=request.medical_history
@@ -107,14 +120,15 @@ async def analyze_symptoms(request: SymptomAnalysisRequest):
 
         logger.info(f"Triage agent routed to: {recommended_specialty} (confidence: {triage_analysis.confidence_score})")
 
-        # Step 2: Route to appropriate specialist agent
+        # Step 3: Route to appropriate specialist agent
         # For now, we only have Cardiology implemented (Neurology/Dermatology in Phase 8)
+        # Uses preprocessed symptoms for more accurate MeTTa reasoning
         specialist_analysis = None
 
         if recommended_specialty.lower() == "cardiology":
             cardiology_agent = get_cardiology_agent()
             specialist_analysis = await cardiology_agent.analyze(
-                symptoms=request.symptoms,
+                symptoms=symptoms_for_analysis,  # Using preprocessed symptoms
                 patient_age=request.patient_age,
                 patient_gender=request.patient_gender,
                 medical_history=request.medical_history
@@ -125,7 +139,7 @@ async def analyze_symptoms(request: SymptomAnalysisRequest):
             logger.warning(f"{recommended_specialty} agent not yet implemented, using cardiology fallback")
             cardiology_agent = get_cardiology_agent()
             specialist_analysis = await cardiology_agent.analyze(
-                symptoms=request.symptoms,
+                symptoms=symptoms_for_analysis,  # Using preprocessed symptoms
                 patient_age=request.patient_age,
                 patient_gender=request.patient_gender,
                 medical_history=request.medical_history
@@ -140,8 +154,9 @@ async def analyze_symptoms(request: SymptomAnalysisRequest):
 
         logger.info(f"Found {len(matching_doctors)} doctors for {specialty_search}")
 
-        asione_client = get_asione_client()
-        asi_one_used = False
+        # asione_client already initialized at the beginning for preprocessing
+        # Track if ANY ASI:One enhancement was used
+        asi_one_used = bool(preprocessing_result)  # True if preprocessing succeeded
 
         # Generate preliminary diagnosis from specialist analysis
         preliminary_diagnosis = specialist_analysis.analysis
@@ -156,7 +171,6 @@ async def analyze_symptoms(request: SymptomAnalysisRequest):
             # Use ASI:One version if different from original
             if patient_friendly_diagnosis != preliminary_diagnosis:
                 preliminary_diagnosis = patient_friendly_diagnosis
-                asi_one_used = True
                 logger.info("ASI:One enhanced preliminary diagnosis")
 
         # Generate consensus reasoning showing multi-agent collaboration

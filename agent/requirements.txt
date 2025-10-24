@@ -1,0 +1,26 @@
+# Core dependencies
+uagents>=0.12.0
+web3>=6.0.0
+python-dotenv>=1.0.0
+
+# Web Framework
+fastapi
+uvicorn[standard]
+pydantic
+
+# Async & HTTP
+httpx
+aiohttp
+
+# CORS
+fastapi-cors
+
+# MeTTa / Hyperon (for reasoning)
+hyperon
+
+# ASI:One Integration
+openai
+
+# Testing
+pytest
+pytest-asyncio

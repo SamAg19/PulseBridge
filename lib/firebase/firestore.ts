@@ -9,7 +9,8 @@ import {
   query,
   where,
   orderBy,
-  serverTimestamp
+  serverTimestamp,
+  setDoc
 } from 'firebase/firestore';
 import { db } from './config';
 import { Task, Appointment, Payment } from '../types';
@@ -562,5 +563,103 @@ export const getConfirmedAppointments = async () => {
     })) as any[];
   } catch (error: any) {
     throw new Error(`Failed to fetch confirmed appointments: ${error.message}`);
+  }
+};
+
+// ============ PATIENT PROFILES ============
+export interface PatientProfile {
+  walletAddress: string;
+  fullName: string;
+  email: string;
+  phoneNumber: string;
+  dateOfBirth: string;
+  address: string;
+  emergencyContact: string;
+  emergencyPhone: string;
+  medicalHistory?: string;
+  allergies?: string;
+  currentMedications?: string;
+  registrationDate: Date;
+  isActive: boolean;
+}
+
+export const createPatientProfile = async (walletAddress: string, profileData: Omit<PatientProfile, 'walletAddress'>) => {
+  try {
+    const docRef = doc(db, 'patients', walletAddress);
+    await updateDoc(docRef, {
+      ...profileData,
+      walletAddress,
+      registrationDate: serverTimestamp(),
+    });
+    return { success: true, patientId: walletAddress };
+  } catch (error: any) {
+    // If document doesn't exist, create it using setDoc
+    try {
+      const docRef = doc(db, 'patients', walletAddress);
+      await setDoc(docRef, {
+        ...profileData,
+        walletAddress,
+        registrationDate: serverTimestamp(),
+      });
+      return { success: true, patientId: walletAddress };
+    } catch (createError: any) {
+      throw new Error(`Failed to create patient profile: ${createError.message}`);
+    }
+  }
+};
+
+export const getPatientProfile = async (walletAddress: string): Promise<PatientProfile | null> => {
+  try {
+    const docRef = doc(db, 'patients', walletAddress);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      return {
+        ...docSnap.data(),
+        registrationDate: docSnap.data().registrationDate?.toDate() || new Date(),
+      } as PatientProfile;
+    }
+    
+    // If not found by document ID, try querying by walletAddress field
+    const q = query(
+      collection(db, 'patients'),
+      where('walletAddress', '==', walletAddress)
+    );
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
+      const doc = querySnapshot.docs[0];
+      return {
+        ...doc.data(),
+        registrationDate: doc.data().registrationDate?.toDate() || new Date(),
+      } as PatientProfile;
+    }
+    
+    return null;
+  } catch (error: any) {
+    console.error('Error fetching patient profile:', error);
+    return null;
+  }
+};
+
+export const updatePatientProfile = async (walletAddress: string, updates: Partial<PatientProfile>) => {
+  try {
+    const docRef = doc(db, 'patients', walletAddress);
+    await updateDoc(docRef, {
+      ...updates,
+      updatedAt: serverTimestamp(),
+    });
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(`Failed to update patient profile: ${error.message}`);
+  }
+};
+
+export const checkPatientExists = async (walletAddress: string): Promise<boolean> => {
+  try {
+    const profile = await getPatientProfile(walletAddress);
+    return profile !== null;
+  } catch (error) {
+    return false;
   }
 };

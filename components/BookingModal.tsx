@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { DoctorProfile, Task, TimeSlot } from '@/lib/types';
-import { createAppointment } from '@/lib/firebase/firestore';
+import { createAppointment, getPatientProfile } from '@/lib/firebase/firestore';
 
 interface BookingModalProps {
   doctor: DoctorProfile;
@@ -72,6 +72,9 @@ export default function BookingModal({ doctor, task, isOpen, onClose, onSuccess 
     try {
       setIsProcessing(true);
       
+      // Get patient profile for email information
+      const patientProfile = await getPatientProfile(address);
+      
       // Create appointment in Firebase
       const appointmentData = {
         doctorId: doctor.id!,
@@ -82,6 +85,9 @@ export default function BookingModal({ doctor, task, isOpen, onClose, onSuccess 
         status: 'pending' as const,
         paymentStatus: 'pending_approval' as const,
         paymentAmount: task.fee,
+        patientEmail: patientProfile?.email || '',
+        patientName: patientProfile?.fullName || '',
+        patientPhone: patientProfile?.phoneNumber || '',
       };
 
       const result = await createAppointment(appointmentData);

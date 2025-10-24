@@ -6,6 +6,9 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { getAppointmentsByPatient, getDoctorById, getReviewsByAppointment, getPrescriptionsByAppointment } from '@/lib/firebase/firestore';
 import { Appointment, DoctorProfile } from '@/lib/types';
 import ReviewModal from '@/components/ReviewModal';
+import PrescriptionViewModal from '@/components/PrescriptionViewModal';
+import ResponsiveLayout from '@/components/ResponsiveLayout';
+import { Calendar, CreditCard, Users, Filter, ExternalLink, FileText, Star, X, Clock } from 'lucide-react';
 
 interface AppointmentWithDoctor extends Appointment {
   id?: string;
@@ -28,6 +31,16 @@ export default function PatientAppointments() {
     isOpen: false,
     appointmentId: '',
     doctorId: '',
+    doctorName: ''
+  });
+
+  const [prescriptionModal, setPrescriptionModal] = useState<{
+    isOpen: boolean;
+    appointmentId: string;
+    doctorName: string;
+  }>({
+    isOpen: false,
+    appointmentId: '',
     doctorName: ''
   });
 
@@ -144,18 +157,43 @@ export default function PatientAppointments() {
     fetchAppointments();
   };
 
+  const handleViewPrescription = (appointmentId: string, doctorName: string) => {
+    setPrescriptionModal({
+      isOpen: true,
+      appointmentId,
+      doctorName
+    });
+  };
+
+  const handleCancelAppointment = async (appointmentId: string) => {
+    if (!confirm('Are you sure you want to cancel this appointment?')) {
+      return;
+    }
+
+    try {
+      // Import updateAppointmentStatus function
+      const { updateAppointmentStatus } = await import('@/lib/firebase/firestore');
+      await updateAppointmentStatus(appointmentId, 'cancelled');
+
+      // Refresh appointments
+      fetchAppointments();
+      alert('Appointment cancelled successfully.');
+    } catch (error) {
+      console.error('Error cancelling appointment:', error);
+      alert('Failed to cancel appointment. Please try again.');
+    }
+  };
+
   if (!isConnected) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-md">
+      <div className="min-h-screen bg-light-blue flex items-center justify-center p-4">
+        <div className="glass-card rounded-2xl p-6 sm:p-8 text-center max-w-md w-full border border-blue-200">
           <div className="mb-6">
             <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
+              <Calendar className="w-8 h-8 text-blue-600" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Connect Your Wallet</h1>
-            <p className="text-gray-600">Please connect your wallet to view your appointments.</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-primary mb-2">Connect Your Wallet</h1>
+            <p className="text-secondary text-sm sm:text-base">Please connect your wallet to view your appointments.</p>
           </div>
           <ConnectButton />
         </div>
@@ -164,59 +202,36 @@ export default function PatientAppointments() {
   }
 
   return (
-    <div className="min-h-screen bg-light-blue">
-      {/* Header */}
-      <header className="glass-card border-b border-blue-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-primary">My Appointments</h1>
-              <p className="text-secondary">Manage your healthcare appointments</p>
-            </div>
-            <div className="flex items-center space-x-4">
-              <a
-                href="/patient"
-                className="px-4 py-2 text-secondary hover:text-primary transition font-medium"
-              >
-                Book New Appointment
-              </a>
-              <a
-                href="/patient/payments"
-                className="px-4 py-2 text-secondary hover:text-primary transition font-medium"
-              >
-                Payment History
-              </a>
-              <ConnectButton />
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <ResponsiveLayout 
+      userType="patient" 
+      title="My Appointments" 
+      subtitle="Manage your healthcare appointments"
+    >
         {/* Filters */}
-        <div className="mb-8">
-          <div className="glass-card rounded-xl p-6 border border-blue-200">
-            <h2 className="text-lg font-semibold text-primary mb-4">Filter Appointments</h2>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { key: 'all', label: 'All Appointments' },
-                { key: 'pending', label: 'Pending' },
-                { key: 'confirmed', label: 'Confirmed' },
-                { key: 'completed', label: 'Completed' },
-                { key: 'cancelled', label: 'Cancelled' }
-              ].map((filterOption) => (
-                <button
-                  key={filterOption.key}
-                  onClick={() => setFilter(filterOption.key as any)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${filter === filterOption.key
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                    }`}
-                >
-                  {filterOption.label}
-                </button>
-              ))}
-            </div>
+        <div className="glass-card rounded-xl p-4 sm:p-6 border border-blue-200 mb-6">
+          <div className="flex items-center space-x-2 mb-4">
+            <Filter className="w-5 h-5 text-blue-600" />
+            <h2 className="text-base sm:text-lg font-semibold text-primary">Filter Appointments</h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { key: 'all', label: 'All Appointments' },
+              { key: 'pending', label: 'Pending' },
+              { key: 'confirmed', label: 'Confirmed' },
+              { key: 'completed', label: 'Completed' },
+              { key: 'cancelled', label: 'Cancelled' }
+            ].map((filterOption) => (
+              <button
+                key={filterOption.key}
+                onClick={() => setFilter(filterOption.key as any)}
+                className={`px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-colors ${filter === filterOption.key
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                  }`}
+              >
+                {filterOption.label}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -238,11 +253,11 @@ export default function PatientAppointments() {
         ) : filteredAppointments.length > 0 ? (
           <div className="space-y-4">
             {filteredAppointments.map((appointment, index) => (
-              <div key={appointment.id || index} className="glass-card rounded-xl p-6 hover:shadow-xl transition-all duration-300 border border-blue-200 transform hover:scale-105">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-4">
+              <div key={appointment.id || index} className="glass-card rounded-xl p-4 sm:p-6 hover:shadow-xl transition-all duration-300 border border-blue-200">
+                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-4 lg:space-y-0">
+                  <div className="flex items-start space-x-3 sm:space-x-4 flex-1">
                     {/* Doctor Avatar */}
-                    <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-lg">
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-sm sm:text-lg flex-shrink-0">
                       {appointment.doctor ?
                         appointment.doctor.fullName.split(' ').map(n => n[0]).join('').toUpperCase() :
                         'Dr'
@@ -250,38 +265,34 @@ export default function PatientAppointments() {
                     </div>
 
                     {/* Appointment Details */}
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-primary">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-base sm:text-lg font-semibold text-primary truncate">
                         Dr. {appointment.doctor?.fullName || 'Unknown Doctor'}
                       </h3>
-                      <p className="text-blue-600 font-medium">
+                      <p className="text-sm sm:text-base text-blue-600 font-medium">
                         {appointment.doctor?.specialization || 'General Medicine'}
                       </p>
 
-                      <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="mt-3 space-y-2 sm:space-y-3">
                         <div>
-                          <div className="flex items-center text-sm text-gray-600 mb-1">
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 0h6m-6 0l-1 1m7-1l1 1m-6 0v6a2 2 0 002 2h2a2 2 0 002-2V8" />
-                            </svg>
+                          <div className="flex items-center text-xs sm:text-sm text-secondary mb-1">
+                            <Calendar className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
                             Date & Time
                           </div>
-                          <div className="font-medium text-gray-900">
+                          <div className="font-medium text-primary text-sm sm:text-base">
                             {formatDate(appointment.scheduledDate)}
                           </div>
-                          <div className="text-sm text-gray-600">
+                          <div className="text-xs sm:text-sm text-secondary">
                             {formatTime(appointment.scheduledTime)}
                           </div>
                         </div>
 
                         <div>
-                          <div className="flex items-center text-sm text-gray-600 mb-1">
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                            </svg>
+                          <div className="flex items-center text-xs sm:text-sm text-secondary mb-1">
+                            <CreditCard className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
                             Payment
                           </div>
-                          <div className="font-medium text-gray-900">
+                          <div className="font-medium text-primary text-sm sm:text-base">
                             {appointment.paymentAmount >= 1 ?
                               `${appointment.paymentAmount} ETH` :
                               `${(appointment.paymentAmount * 1000).toFixed(0)} mETH`
@@ -292,35 +303,34 @@ export default function PatientAppointments() {
                           </span>
                         </div>
 
-                        {appointment.status === 'confirmed' && (
-                          <div>
-                            <div className="flex items-center text-sm text-gray-600 mb-1">
-                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                              </svg>
-                              Meeting
-                            </div>
-                            <div className="font-medium text-gray-900">
-                              {(appointment as any).meetingLink ? 'Link Available' : 'Pending'}
-                            </div>
-                            {(appointment as any).meetingId && (
-                              <div className="text-xs text-gray-500">
-                                ID: {(appointment as any).meetingId}
-                              </div>
-                            )}
+                        <div>
+                          <div className="flex items-center text-xs sm:text-sm text-secondary mb-1">
+                            <Clock className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
+                            Status
                           </div>
-                        )}
+                          <div className="font-medium text-primary text-sm sm:text-base">
+                            {appointment.status === 'pending' && 'Awaiting Confirmation'}
+                            {appointment.status === 'confirmed' && 'Ready for Meeting'}
+                            {appointment.status === 'completed' && 'Consultation Complete'}
+                            {appointment.status === 'cancelled' && 'Cancelled'}
+                          </div>
+                          {appointment.status === 'confirmed' && (
+                            <div className="text-xs text-secondary mt-1">
+                              {(appointment as any).meetingLink ? '✓ Meeting link ready' : '⏳ Waiting for meeting link'}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
 
                   {/* Status and Actions */}
-                  <div className="text-right">
-                    <span className={`inline-block px-3 py-1 text-sm rounded-full font-medium ${getStatusColor(appointment.status)}`}>
+                  <div className="lg:text-right lg:flex-shrink-0">
+                    <span className={`inline-block px-3 py-1 text-xs sm:text-sm rounded-full font-medium ${getStatusColor(appointment.status)}`}>
                       {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
                     </span>
 
-                    <div className="mt-4 space-y-2">
+                    <div className="mt-4 space-y-2 lg:min-w-[160px]">
                       {appointment.status === 'confirmed' && (
                         <>
                           {(appointment as any).meetingLink ? (
@@ -328,14 +338,15 @@ export default function PatientAppointments() {
                               href={(appointment as any).meetingLink}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="block w-full px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors text-center"
+                              className="flex items-center justify-center w-full px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-green-700 transition-colors"
                             >
+                              <ExternalLink className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
                               Join Meeting
                             </a>
                           ) : (
                             <button
                               disabled
-                              className="block w-full px-4 py-2 bg-gray-300 text-gray-500 rounded-lg text-sm font-medium cursor-not-allowed"
+                              className="block w-full px-3 sm:px-4 py-2 bg-gray-300 text-gray-500 rounded-lg text-xs sm:text-sm font-medium cursor-not-allowed"
                             >
                               Waiting for Meeting Link
                             </button>
@@ -346,7 +357,14 @@ export default function PatientAppointments() {
                       {appointment.status === 'completed' && (
                         <>
                           {appointment.hasPrescription && (
-                            <button className="block w-full px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors">
+                            <button
+                              onClick={() => handleViewPrescription(
+                                appointment.id || '',
+                                appointment.doctor?.fullName || 'Unknown Doctor'
+                              )}
+                              className="flex items-center justify-center w-full px-3 sm:px-4 py-2 bg-purple-600 text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-purple-700 transition-colors"
+                            >
+                              <FileText className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
                               View Prescription
                             </button>
                           )}
@@ -354,8 +372,9 @@ export default function PatientAppointments() {
                           {appointment.hasReview ? (
                             <button
                               disabled
-                              className="block w-full px-4 py-2 bg-gray-300 text-gray-500 rounded-lg text-sm font-medium cursor-not-allowed"
+                              className="flex items-center justify-center w-full px-3 sm:px-4 py-2 bg-gray-300 text-gray-500 rounded-lg text-xs sm:text-sm font-medium cursor-not-allowed"
                             >
+                              <Star className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
                               Review Submitted
                             </button>
                           ) : (
@@ -365,8 +384,9 @@ export default function PatientAppointments() {
                                 appointment.doctorId,
                                 appointment.doctor?.fullName || 'Unknown Doctor'
                               )}
-                              className="block w-full px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                              className="flex items-center justify-center w-full px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-blue-700 transition-colors"
                             >
+                              <Star className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
                               Leave Review
                             </button>
                           )}
@@ -374,7 +394,11 @@ export default function PatientAppointments() {
                       )}
 
                       {appointment.status === 'pending' && (
-                        <button className="block w-full px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors">
+                        <button
+                          onClick={() => handleCancelAppointment(appointment.id || '')}
+                          className="flex items-center justify-center w-full px-3 sm:px-4 py-2 bg-red-600 text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-red-700 transition-colors"
+                        >
+                          <X className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
                           Cancel
                         </button>
                       )}
@@ -385,14 +409,12 @@ export default function PatientAppointments() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 0h6m-6 0l-1 1m7-1l1 1m-6 0v6a2 2 0 002 2h2a2 2 0 002-2V8" />
-              </svg>
+          <div className="glass-card rounded-xl p-6 sm:p-12 text-center border border-blue-200">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Calendar className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No appointments found</h3>
-            <p className="text-gray-600 mb-4">
+            <h3 className="text-base sm:text-lg font-medium text-primary mb-2">No appointments found</h3>
+            <p className="text-secondary mb-4 text-sm sm:text-base">
               {filter === 'all'
                 ? "You haven't booked any appointments yet."
                 : `No ${filter} appointments found.`
@@ -400,14 +422,12 @@ export default function PatientAppointments() {
             </p>
             <a
               href="/patient"
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
             >
               Book Your First Appointment
             </a>
           </div>
         )}
-      </div>
-
       {/* Review Modal */}
       <ReviewModal
         isOpen={reviewModal.isOpen}
@@ -417,6 +437,14 @@ export default function PatientAppointments() {
         doctorName={reviewModal.doctorName}
         onSuccess={handleReviewSuccess}
       />
-    </div>
+
+      {/* Prescription View Modal */}
+      <PrescriptionViewModal
+        isOpen={prescriptionModal.isOpen}
+        onClose={() => setPrescriptionModal({ ...prescriptionModal, isOpen: false })}
+        appointmentId={prescriptionModal.appointmentId}
+        doctorName={prescriptionModal.doctorName}
+      />
+    </ResponsiveLayout>
   );
 }

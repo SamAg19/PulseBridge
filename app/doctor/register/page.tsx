@@ -86,7 +86,7 @@ export default function DoctorRegisterPage() {
         // Check if doctor is already registered
         const checkRegistration = async () => {
 
-            if (address) {
+            if (!address) {
                 try {
                     const email = await checkDoctorRegistration(String(address));
                     const isDoc = await getDoctor();
@@ -218,7 +218,7 @@ export default function DoctorRegisterPage() {
                 formData.specialization,
                 formData.profileDescription,
                 formData.email,
-                formData.consultationfee,
+                BigInt(formData.consultationfee),
                 formData.licenseNumber, // fix this..
             ],
 

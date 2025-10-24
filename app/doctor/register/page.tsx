@@ -2,24 +2,79 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAccount } from 'wagmi';
+import { useReadContract, useChainId, useConfig, useAccount, useWriteContract } from 'wagmi'
 import Link from 'next/link';
 import { registerDoctorWithWallet, checkDoctorRegistration } from '@/lib/firebase/auth';
 import { DoctorProfile } from '@/lib/types';
+import { readContract, waitForTransactionReceipt, type WriteContractReturnType, getBalance } from "@wagmi/core"
+import { parseEther, formatEther, stringToHex, padHex, formatUnits } from 'viem'
+import { chains, DoctorRegistry, ConsultationEscrow, erc20Abi } from "../../constants"
+import { writeContractSync } from 'viem/actions';
+import { StringDecoder } from 'node:string_decoder';
+
 
 export default function DoctorRegisterPage() {
     const { address, isConnected } = useAccount();
+    const chainId = useChainId()
+    const DocRegistry = chains[chainId]["DoctorRegistry"]
+    const PYUSD = chains[chainId]["PYUSD"]
+    const config = useConfig()
+
+    // PINATA
+    const [file, setFile] = useState<File>();
+    const [url, setUrl] = useState("");
+    const [uploading, setUploading] = useState(false);
+
     const router = useRouter();
     const [formData, setFormData] = useState({
         fullName: '',
         specialization: '',
         licenseNumber: '',
         email: '',
+        paymentwallet: '',
+        consultationfee: '',
+        profileDescription: '',
+
     });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [fee, setFee] = useState("0");
+    const [stake, setStake] = useState("0")
     const [checkingRegistration, setCheckingRegistration] = useState(true);
     const [doctorData, setDoctorData] = useState<(DoctorProfile & { id: string; walletAddress: string }) | null>(null);
+    const { data: hash, isPending, writeContractAsync } = useWriteContract()
+
+    const uploadFile = async () => {
+        try {
+            if (!file) {
+                alert("No file selected");
+                return;
+            }
+
+            setUploading(true);
+            const data = new FormData();
+            data.set("file", file);
+            const uploadRequest = await fetch("/api/files", {
+                method: "POST",
+                body: data,
+            });
+            const cid = await uploadRequest.json();
+            setUrl(cid);
+            setFormData({ ...formData, licenseNumber: cid });
+            setUploading(false);
+
+
+        } catch (e) {
+            console.log(e);
+            setUploading(false);
+            alert("Trouble uploading file");
+        }
+    };
+
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setFile(e.target?.files?.[0]);
+    };
 
     useEffect(() => {
         if (!isConnected) {
@@ -29,12 +84,15 @@ export default function DoctorRegisterPage() {
 
         // Check if doctor is already registered
         const checkRegistration = async () => {
-            if (address) {
+
+            if (!address) {
                 try {
-                    const data = await checkDoctorRegistration(address);
-                    if (data) {
-                        setDoctorData(data);
-                        if (data.verificationStatus === 'approved') {
+                    //backend stuff.
+                    const data = await checkDoctorRegistration(String(address));
+                    const isDoc = await getDoctor();
+                    if (isDoc && data) {
+
+                        if (isDoc != 0) {
                             router.push('/dashboard');
                         } else {
                             router.push('/doctor/pending');
@@ -47,10 +105,121 @@ export default function DoctorRegisterPage() {
                 }
             }
             setCheckingRegistration(false);
+            await getFees()
         };
 
         checkRegistration();
     }, [address, isConnected, router]);
+
+
+    async function getDoctor(): Promise<Number> {
+
+        if (!address || !address.startsWith('0x') || address.length !== 42) {
+            throw new Error('Invalid address format')
+        }
+
+        const isDoctor = await readContract(config, {
+            abi: DoctorRegistry,
+            address: DocRegistry as `0x${string}`,
+            functionName: 'getDoctorID',
+            args: [address as `0x${string}`],
+        })
+        return Number(isDoctor)
+    }
+
+    async function getFees(): Promise<[number, number]> {
+
+        const stakeAmount = await readContract(config, {
+
+            abi: DoctorRegistry,
+            address: DocRegistry as `0x${string}`,
+            functionName: 'stakeAmount',
+        })
+
+        const depositFee = await readContract(config, {
+
+            abi: DoctorRegistry,
+            address: DocRegistry as `0x${string}`,
+            functionName: 'depositFee',
+        })
+        console.log(depositFee, stakeAmount);
+
+
+        setFee(formatUnits(depositFee as bigint, 6))
+        setStake(formatUnits(stakeAmount as bigint, 6))
+
+        return [Number(stakeAmount), Number(depositFee)];
+
+
+    }
+
+    async function getApprovedPYUSD(): Promise<number> {
+
+        const response = await readContract(config, {
+
+            abi: erc20Abi,
+            address: PYUSD as `0x${string}`,
+            functionName: `allowance`,
+            args: [address as `0x${string}`, DocRegistry as `0x${string}`]
+        })
+
+        const [stakeAmount, depositFee] = await getFees();
+        if (stakeAmount > Number(response)) {
+            if (Number(response) == 0) {
+                await writeContractAsync({
+                    abi: erc20Abi,
+                    address: PYUSD as `0x${string}`,
+                    functionName: "approve",
+                    args: [
+                        DocRegistry as `0x${string}`,
+                        stakeAmount,
+                    ],
+                })
+
+            } else {
+                const unapprovedAmount = stakeAmount - Number(response);
+
+                await writeContractAsync({
+                    abi: erc20Abi,
+                    address: PYUSD as `0x${string}`,
+                    functionName: "approve",
+                    args: [
+                        DocRegistry as `0x${string}`,
+                        unapprovedAmount,
+                    ],
+                })
+
+            }
+        }
+        return response as number
+    }
+
+
+
+
+    async function registerAsDoctor() {
+        const licenseNumberBytes32 = padHex(stringToHex(formData.licenseNumber), { size: 32 });
+
+        await getApprovedPYUSD();
+
+        await writeContractAsync({
+            abi: DoctorRegistry,
+            address: DocRegistry as `0x${string}`,
+            functionName: "registerAsDoctor",
+            args: [
+                formData.fullName,
+                formData.specialization,
+                formData.profileDescription,
+                formData.email,
+                formData.consultationfee,
+                formData.licenseNumber, // fix this..
+            ],
+
+        })
+
+        // Depending on outcome show a popup or something..
+
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -60,7 +229,7 @@ export default function DoctorRegisterPage() {
         setLoading(true);
 
         try {
-            await registerDoctorWithWallet(address, formData);
+            await registerAsDoctor(); // Remove the 'e' parameter from registerAsDoctor
             router.push('/doctor/pending');
         } catch (err: any) {
             setError(err.message);
@@ -169,21 +338,93 @@ export default function DoctorRegisterPage() {
                             </div>
 
                             <div>
-                                <label htmlFor="licenseNumber" className="block text-sm font-semibold text-primary mb-2">
-                                    License Number
+                                <label htmlFor="consultationfee" className="block text-sm font-semibold text-primary mb-2">
+                                    Consultation Fee per hour
                                 </label>
                                 <input
-                                    id="licenseNumber"
-                                    type="text"
-                                    value={formData.licenseNumber}
-                                    onChange={(e) => setFormData({ ...formData, licenseNumber: e.target.value })}
+                                    id="consultationfee"
+                                    type="number"
+                                    value={formData.consultationfee}
+                                    onChange={(e) => setFormData({ ...formData, consultationfee: e.target.value })}
                                     className="w-full px-4 py-4 bg-white border border-blue-200 rounded-xl text-gray-900 placeholder-gray-500 input-focus focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    placeholder="MD123456"
+                                    placeholder="$100"
                                     required
                                 />
                             </div>
                         </div>
 
+                        <div className="grid md:grid-cols-2 gap-6">
+                            <div>
+                                <label htmlFor="paymentwallet" className="block text-sm font-semibold text-primary mb-2">
+                                    Payment Wallet
+                                </label>
+                                <input
+                                    id="paymentwallet"
+                                    type="text"
+                                    value={formData.paymentwallet}
+                                    // onClick={(e) => setFormData({ ...formData, paymentwallet: address })}
+                                    onChange={(e) => setFormData({ ...formData, paymentwallet: e.target.value })}
+                                    className="w-full px-4 py-4 bg-white border border-blue-200 rounded-xl text-gray-900 placeholder-gray-500 input-focus focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder={`${address}`}
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="licenseNumber" className="block text-sm font-semibold text-primary mb-2">
+                                    License Document
+                                </label>
+                                <input type="file" onChange={handleChange} required />
+                                <button type="button" className="w-full px-3 py-3 bg-white border border-blue-200 rounded-xl text-gray-900 placeholder-gray-500 input-focus focus:outline-none focus:ring-2 focus:ring-blue-500" disabled={uploading} onClick={uploadFile} >
+                                    {uploading ? "Uploading..." : "Upload"}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="grid md:grid-cols-1 gap-5">
+                            <div>
+                                <label htmlFor="specialization" className="block text-sm font-semibold text-primary mb-2">
+                                    Profile Description
+                                </label>
+                                <input
+                                    id="specialization"
+                                    type="text"
+                                    value={formData.profileDescription}
+                                    onChange={(e) => setFormData({ ...formData, profileDescription: e.target.value })}
+                                    className="w-full px-5 py-10 bg-white border border-blue-200 rounded-xl text-gray-900 placeholder-gray-500 input-focus focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Describe yourself to your new clients!"
+                                    required
+                                />
+                            </div>
+
+
+                        </div>
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
+                            <h3 className="text-lg font-semibold text-primary mb-4 flex items-center">
+                                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Registration Fees
+                            </h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-white rounded-lg p-4 shadow-sm">
+                                    <p className="text-sm text-gray-600 mb-1">Deposit Fee</p>
+                                    <p className="text-2xl font-bold text-blue-600">${fee}</p>
+                                    <p className="text-xs text-gray-500 mt-1">One-time payment</p>
+                                </div>
+                                <div className="bg-white rounded-lg p-4 shadow-sm">
+                                    <p className="text-sm text-gray-600 mb-1">Stake Amount</p>
+                                    <p className="text-2xl font-bold text-blue-600">${stake}</p>
+                                    <p className="text-xs text-gray-500 mt-1">Refundable</p>
+                                </div>
+                            </div>
+                            <p className="text-xs text-gray-600 mt-4 flex items-start">
+                                <svg className="w-4 h-4 mr-1 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                </svg>
+                                <b>Total required: {stake} PYUSD. The stake amount will be returned when your account has been activated.</b>
+                            </p>
+                        </div>
                         <button
                             type="submit"
                             disabled={loading}
@@ -214,7 +455,7 @@ export default function DoctorRegisterPage() {
                 <div className="text-center mt-6 animate-fadeInUp" style={{ animationDelay: '0.3s' }}>
                     <div className="glass-effect p-4 rounded-xl inline-block">
                         <p className="text-blue-600 text-sm font-medium">
-                            🔒 Your information will be reviewed for verification within 24-48 hours
+                            🔒 Your information will be reviewed for verification within 24-49 hours
                         </p>
                     </div>
                 </div>

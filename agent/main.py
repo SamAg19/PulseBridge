@@ -51,15 +51,25 @@ async def startup_event():
     logger.info(f"Environment: {os.getenv('NETWORK', 'localhost')}")
     logger.info(f"API Port: {os.getenv('AGENT_PORT', 8000)}")
 
-    # Initialize components (will be added in later phases)
+    # Initialize components
     logger.info("FastAPI server initialized")
     logger.info("API routes registered")
     logger.info("CORS middleware configured")
 
-    # TODO: Initialize MeTTa engine
-    # TODO: Initialize agents
-    # TODO: Connect to blockchain
-    # TODO: Setup ASI:One client
+    # Initialize blockchain connection
+    try:
+        from services.doctor_matcher import get_doctor_matcher
+        matcher = get_doctor_matcher()
+        logger.info("Blockchain connection initialized")
+        logger.info("DoctorRegistry contract loaded")
+        logger.info("DoctorMatcher service ready")
+    except Exception as e:
+        logger.error(f"Blockchain initialization failed: {e}")
+        logger.warning("System will continue but doctor queries may fail")
+
+    # TODO: Initialize MeTTa engine (Phase 3)
+    # TODO: Initialize agents (Phase 4-5)
+    # TODO: Setup ASI:One client (Phase 6)
 
     logger.info("=" * 60)
     logger.info("System Ready - Waiting for requests")

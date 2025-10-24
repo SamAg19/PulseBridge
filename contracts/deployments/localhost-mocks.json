@@ -1,7 +1,7 @@
 {
   "network": "localhost",
   "chainId": 31337,
-  "timestamp": "2025-10-23T10:56:00.375Z",
+  "timestamp": "2025-10-24T15:51:45.637Z",
   "deployer": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
   "useMocks": true,
   "infrastructure": {

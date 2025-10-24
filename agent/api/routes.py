@@ -13,6 +13,10 @@ from api.models import (
 )
 from datetime import datetime
 import time
+import logging
+from services.doctor_matcher import get_doctor_matcher
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["Analysis"])
 
@@ -24,12 +28,23 @@ async def health_check():
 
     Returns system status and component health
     """
+    # Check blockchain connection
+    contract_connected = False
+    try:
+        matcher = get_doctor_matcher()
+        # Test connectivity by calling a simple read function
+        num_doctors = matcher.registry.get_num_doctors()
+        contract_connected = True
+        logger.info(f"Health check: DoctorRegistry has {num_doctors} doctors")
+    except Exception as e:
+        logger.warning(f"Health check: Blockchain connection failed - {e}")
+
     return HealthCheckResponse(
-        status="healthy",
+        status="healthy" if contract_connected else "degraded",
         agents_loaded=["triage", "cardiology"],
-        metta_engine_status="active",
-        contract_connected=True,
-        asi_one_available=True,
+        metta_engine_status="pending",  # Will be "active" in Phase 3
+        contract_connected=contract_connected,
+        asi_one_available=False,  # Will be True in Phase 6
         timestamp=datetime.now().isoformat()
     )
 
@@ -40,7 +55,7 @@ async def agent_status():
     Get status of all agents
     """
     return AgentStatusResponse(
-        total_agents=4,
+        total_agents=2,
         agents={
             "triage": {
                 "status": "active",
@@ -76,6 +91,16 @@ async def analyze_symptoms(request: SymptomAnalysisRequest):
     start_time = time.time()
 
     try:
+        # Get recommended specialization (will be from MeTTa in later phases)
+        # For now, using "Cardiology" as default for mock response
+        recommended_specialization = "Cardiology"
+
+        # Query real doctors from blockchain
+        matcher = get_doctor_matcher()
+        matching_doctors = await matcher.find_doctors(recommended_specialization)
+
+        logger.info(f"Found {len(matching_doctors)} doctors for {recommended_specialization}")
+
         # MOCK RESPONSE FOR NOW - Will be replaced with real orchestrator
         # This allows frontend to start integrating immediately
 
@@ -127,8 +152,8 @@ async def analyze_symptoms(request: SymptomAnalysisRequest):
                 )
             },
             consensus_reasoning="After collaborative analysis, Cardiology specialist identified 85% probability of cardiac condition. Triage assessment confirmed high priority routing. Consensus: Primary concern is cardiovascular, requiring urgent specialist consultation. Patient should be seen by cardiologist within 24 hours.",
-            available_doctors=[],
-            total_doctors_found=0,
+            available_doctors=matching_doctors,
+            total_doctors_found=len(matching_doctors),
             analysis_timestamp=datetime.now().isoformat(),
             processing_time_ms=int((time.time() - start_time) * 1000),
             asi_one_enhanced=True

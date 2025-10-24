@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-import { X, Mail, Send, CheckCircle, AlertCircle, ExternalLink, Copy } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Mail, Send, CheckCircle, AlertCircle, ExternalLink, Copy, Users } from 'lucide-react';
 import { sendMeetingLinksToAll, generateJitsiMeetingLink, MeetingEmailData } from '@/lib/email/emailService';
-import { updateAppointmentMeetingLink } from '@/lib/firebase/firestore';
+import { updateAppointmentMeetingLink, initializeMeetingVerification } from '@/lib/firebase/firestore';
+import MeetingVerification from './MeetingVerification';
+import { MeetingVerification as MeetingVerificationType } from '@/lib/types';
 
 interface SendMeetingLinkModalProps {
   isOpen: boolean;
@@ -19,7 +21,10 @@ interface SendMeetingLinkModalProps {
     scheduledTime: string;
     taskTitle?: string;
     meetingLink?: string;
+    status?: string;
+    verification?: MeetingVerificationType;
   };
+  userType?: 'doctor' | 'patient';
   onSuccess: () => void;
 }
 
@@ -27,6 +32,7 @@ export default function SendMeetingLinkModal({
   isOpen, 
   onClose, 
   appointment, 
+  userType = 'doctor',
   onSuccess 
 }: SendMeetingLinkModalProps) {
   const [sending, setSending] = useState(false);
@@ -39,6 +45,15 @@ export default function SendMeetingLinkModal({
     errors: string[];
   } | null>(null);
   const [step, setStep] = useState<'setup' | 'sending' | 'result'>('setup');
+  const [activeTab, setActiveTab] = useState<'meeting' | 'verification'>('meeting');
+  const [verification, setVerification] = useState<MeetingVerificationType | null>(null);
+
+  useEffect(() => {
+    if (isOpen && appointment.status === 'confirmed' && !appointment.verification) {
+      // Initialize verification for confirmed appointments that don't have it yet
+      initializeMeetingVerification(appointment.id).catch(console.error);
+    }
+  }, [isOpen, appointment.id, appointment.status, appointment.verification]);
 
   const formatDate = (date: any) => {
     if (!date) return 'N/A';
@@ -138,7 +153,13 @@ export default function SendMeetingLinkModal({
   const handleClose = () => {
     setStep('setup');
     setResult(null);
+    setActiveTab('meeting');
     onClose();
+  };
+
+  const handleVerificationUpdate = (updatedVerification: MeetingVerificationType) => {
+    setVerification(updatedVerification);
+    onSuccess(); // Refresh parent component data
   };
 
   if (!isOpen) return null;
@@ -149,8 +170,8 @@ export default function SendMeetingLinkModal({
         <div className="sticky top-0 bg-white/80 backdrop-blur-sm border-b border-blue-200 p-6 rounded-t-2xl">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-primary">Send Meeting Links</h2>
-              <p className="text-secondary text-sm sm:text-base">Send Jitsi meeting links to both doctor and patient</p>
+              <h2 className="text-xl sm:text-2xl font-bold text-primary">Meeting Management</h2>
+              <p className="text-secondary text-sm sm:text-base">Manage meeting links and verification</p>
             </div>
             <button
               onClick={handleClose}
@@ -159,10 +180,106 @@ export default function SendMeetingLinkModal({
               <X className="w-5 h-5 text-gray-500" />
             </button>
           </div>
+
+          {/* Tab Navigation */}
+          {appointment.status === 'confirmed' && (
+            <div className="flex space-x-1 mt-4 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setActiveTab('meeting')}
+                className={`flex-1 flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === 'meeting'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Mail className="w-4 h-4 mr-2" />
+                Meeting Links
+              </button>
+              <button
+                onClick={() => setActiveTab('verification')}
+                className={`flex-1 flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === 'verification'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Users className="w-4 h-4 mr-2" />
+                Verification
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="p-6">
-          {step === 'setup' && (
+          {activeTab === 'verification' && appointment.status === 'confirmed' ? (
+            <div className="space-y-6">
+              {/* Appointment Details */}
+              <div className="bg-blue-50 rounded-lg p-4">
+                <h3 className="font-semibold text-primary mb-3">Appointment Details</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="font-medium text-gray-700">Patient:</span>
+                    <span className="ml-2 text-gray-900">
+                      {appointment.patientName || `${appointment.patientId.slice(0, 6)}...`}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Doctor:</span>
+                    <span className="ml-2 text-gray-900">Dr. {appointment.doctorName}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Date:</span>
+                    <span className="ml-2 text-gray-900">{formatDate(appointment.scheduledDate)}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Time:</span>
+                    <span className="ml-2 text-gray-900">{formatTime(appointment.scheduledTime)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Meeting Link Display */}
+              {appointment.meetingLink && (
+                <div className="bg-green-50 rounded-lg p-4">
+                  <h3 className="font-semibold text-primary mb-3">Meeting Link</h3>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="text"
+                      value={appointment.meetingLink}
+                      readOnly
+                      className="flex-1 px-3 py-2 bg-white border border-green-200 rounded text-sm"
+                    />
+                    <button
+                      onClick={() => copyToClipboard(appointment.meetingLink!)}
+                      className="p-2 text-green-600 hover:text-green-800 transition-colors"
+                      title="Copy link"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                    <a
+                      href={appointment.meetingLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 text-green-600 hover:text-green-800 transition-colors"
+                      title="Open meeting"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Meeting Verification Component */}
+              <MeetingVerification
+                appointmentId={appointment.id}
+                userType={userType}
+                onVerificationUpdate={(updatedVerification) => {
+                  setVerification(updatedVerification);
+                  onSuccess(); // Refresh parent component
+                }}
+              />
+            </div>
+          ) : step === 'setup' && (
             <div className="space-y-6">
               {/* Appointment Details */}
               <div className="bg-blue-50 rounded-lg p-4">

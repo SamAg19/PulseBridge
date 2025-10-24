@@ -7,6 +7,7 @@ import { getAppointmentsByPatient, getDoctorById, getReviewsByAppointment, getPr
 import { Appointment, DoctorProfile } from '@/lib/types';
 import ReviewModal from '@/components/ReviewModal';
 import PrescriptionViewModal from '@/components/PrescriptionViewModal';
+import PrescriptionVerification from '@/components/PrescriptionVerification';
 import ResponsiveLayout from '@/components/ResponsiveLayout';
 import { Calendar, CreditCard, Users, Filter, ExternalLink, FileText, Star, X, Clock } from 'lucide-react';
 
@@ -323,6 +324,21 @@ export default function PatientAppointments() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Prescription Verification Section */}
+                  {appointment.status === 'completed' && appointment.hasPrescription && (
+                    <div className="lg:col-span-2 mt-4">
+                      <PrescriptionVerification
+                        appointmentId={appointment.id || ''}
+                        patientId={address || ''}
+                        doctorName={appointment.doctor?.fullName || 'Unknown Doctor'}
+                        prescriptionDelivered={appointment.prescriptionDelivered || false}
+                        prescriptionVerified={appointment.prescriptionVerified || false}
+                        prescriptionVerificationTime={appointment.prescriptionVerificationTime}
+                        onVerificationUpdate={fetchAppointments}
+                      />
+                    </div>
+                  )}
 
                   {/* Status and Actions */}
                   <div className="lg:text-right lg:flex-shrink-0">

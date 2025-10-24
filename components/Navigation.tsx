@@ -4,8 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import PatientProfileModal from './PatientProfileModal';
-import DoctorProfileModal from './DoctorProfileModal';
 import { 
   Menu, 
   X, 
@@ -25,7 +23,6 @@ interface NavigationProps {
 
 export default function Navigation({ userType }: NavigationProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [showProfileModal, setShowProfileModal] = useState(false);
   const pathname = usePathname();
 
   const getNavigationItems = () => {
@@ -103,13 +100,13 @@ export default function Navigation({ userType }: NavigationProps) {
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center space-x-4">
             {userType !== 'admin' && (
-              <button
-                onClick={() => setShowProfileModal(true)}
+              <Link
+                href={userType === 'patient' ? '/patient/profile' : '/doctor/profile'}
                 className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-blue-50 transition-colors"
                 title="View Profile"
               >
                 <UserCircle className="w-6 h-6" />
-              </button>
+              </Link>
             )}
             {userType !== 'admin' && <ConnectButton />}
             {userType === 'admin' && (
@@ -156,16 +153,14 @@ export default function Navigation({ userType }: NavigationProps) {
             <div className="mt-4 pt-4 border-t border-blue-200">
               {userType !== 'admin' && (
                 <div className="space-y-3">
-                  <button
-                    onClick={() => {
-                      setShowProfileModal(true);
-                      setIsMenuOpen(false);
-                    }}
+                  <Link
+                    href={userType === 'patient' ? '/patient/profile' : '/doctor/profile'}
+                    onClick={() => setIsMenuOpen(false)}
                     className="flex items-center space-x-3 px-4 py-3 w-full text-left rounded-lg text-sm font-medium text-secondary hover:text-primary hover:bg-blue-50 transition-colors"
                   >
                     <UserCircle className="w-5 h-5" />
                     <span>My Profile</span>
-                  </button>
+                  </Link>
                   <div className="px-4">
                     <ConnectButton />
                   </div>
@@ -183,20 +178,7 @@ export default function Navigation({ userType }: NavigationProps) {
         )}
       </div>
 
-      {/* Profile Modals */}
-      {userType === 'patient' && (
-        <PatientProfileModal
-          isOpen={showProfileModal}
-          onClose={() => setShowProfileModal(false)}
-        />
-      )}
-      
-      {userType === 'doctor' && (
-        <DoctorProfileModal
-          isOpen={showProfileModal}
-          onClose={() => setShowProfileModal(false)}
-        />
-      )}
+
     </header>
   );
 }

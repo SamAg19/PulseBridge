@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAccount } from 'wagmi';
 import { DoctorWithTasks, Task, TimeSlot } from '@/lib/types';
-import BookingModal from '@/components/BookingModal';
 
 interface DoctorModalProps {
   doctor: DoctorWithTasks;
@@ -13,8 +13,7 @@ interface DoctorModalProps {
 
 export default function DoctorModal({ doctor, isOpen, onClose }: DoctorModalProps) {
   const { address } = useAccount();
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [showBookingModal, setShowBookingModal] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     if (isOpen) {
@@ -57,8 +56,16 @@ export default function DoctorModal({ doctor, isOpen, onClose }: DoctorModalProp
   };
 
   const handleBookService = (task: Task) => {
-    setSelectedTask(task);
-    setShowBookingModal(true);
+    if (!doctor.id || !task.id) {
+      console.error('Missing doctor ID or task ID');
+      return;
+    }
+    
+    // Close the modal first
+    onClose();
+    
+    // Navigate to the booking page
+    router.push(`/patient/booking/${doctor.id}/${task.id}`);
   };
 
   const getCategoryIcon = (category: string) => {
@@ -69,6 +76,19 @@ export default function DoctorModal({ doctor, isOpen, onClose }: DoctorModalProp
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
         );
+      case 'specialist':
+        return (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+          </svg>
+        );
+      case 'urgent':
+        return (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        );
+      // Legacy support for existing tasks
       case 'procedure':
         return (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -82,7 +102,11 @@ export default function DoctorModal({ doctor, isOpen, onClose }: DoctorModalProp
           </svg>
         );
       default:
-        return null;
+        return (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+        );
     }
   };
 
@@ -254,22 +278,7 @@ export default function DoctorModal({ doctor, isOpen, onClose }: DoctorModalProp
         </div>
       </div>
 
-      {showBookingModal && selectedTask && (
-        <BookingModal
-          doctor={doctor}
-          task={selectedTask}
-          isOpen={showBookingModal}
-          onClose={() => {
-            setShowBookingModal(false);
-            setSelectedTask(null);
-          }}
-          onSuccess={() => {
-            setShowBookingModal(false);
-            setSelectedTask(null);
-            onClose();
-          }}
-        />
-      )}
+
     </>
   );
 }

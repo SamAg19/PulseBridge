@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useAccount } from 'wagmi';
 import { createPrescription } from '@/lib/firebase/firestore';
+import { updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
 import { Medication } from '@/lib/types';
 
 interface PrescriptionModalProps {
@@ -67,6 +69,7 @@ export default function PrescriptionModal({
     try {
       setIsSubmitting(true);
       
+      // Create the prescription
       await createPrescription({
         appointmentId,
         doctorId: address,
@@ -74,6 +77,12 @@ export default function PrescriptionModal({
         medications: validMedications,
         instructions: instructions.trim(),
         notes: notes.trim()
+      });
+
+      // Mark prescription as delivered in the appointment
+      await updateDoc(doc(db, 'appointments', appointmentId), {
+        prescriptionDelivered: true,
+        updatedAt: serverTimestamp(),
       });
 
       onSuccess();
@@ -246,6 +255,27 @@ export default function PrescriptionModal({
             />
           </div>
 
+          {/* Delivery Information */}
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start space-x-3">
+              <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <h4 className="font-medium text-blue-900 mb-1">Prescription Delivery Process</h4>
+                <p className="text-sm text-blue-800 mb-2">
+                  After creating this prescription, the patient will be notified and can arrange for pickup or delivery. 
+                  The patient will need to confirm receipt to complete the verification process.
+                </p>
+                <ul className="text-sm text-blue-800 space-y-1">
+                  <li>• Prescription will be marked as "delivered" upon creation</li>
+                  <li>• Patient will receive notification to arrange pickup/delivery</li>
+                  <li>• Patient must confirm receipt for payment processing</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
           {/* Actions */}
           <div className="flex space-x-3">
             <button
@@ -260,7 +290,7 @@ export default function PrescriptionModal({
               disabled={isSubmitting}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? 'Creating...' : 'Create Prescription'}
+              {isSubmitting ? 'Creating & Marking as Delivered...' : 'Create Prescription & Mark as Delivered'}
             </button>
           </div>
         </form>

@@ -49,6 +49,10 @@ export interface Appointment {
   meetingLink?: string;
   meetingId?: string;
   attendanceTracking?: AttendanceTracking;
+  verification?: MeetingVerification;
+  prescriptionDelivered?: boolean;
+  prescriptionVerified?: boolean;
+  prescriptionVerificationTime?: any;
   createdAt: any;
 }
 
@@ -63,6 +67,25 @@ export interface AttendanceTracking {
   bothParticipantsPresent: boolean;
 }
 
+export interface MeetingVerification {
+  doctorVerified: boolean;
+  patientVerified: boolean;
+  doctorVerificationTime?: any;
+  patientVerificationTime?: any;
+  meetingStartTime?: any;
+  meetingEndTime?: any;
+}
+
+export interface PaymentEscrowStatus {
+  status: 'held' | 'released_to_doctor' | 'released_to_patient' | 'disputed';
+  releaseConditions: {
+    meetingVerified: boolean;
+    prescriptionDelivered: boolean;
+    prescriptionVerified: boolean;
+  };
+  releaseTimestamp?: any;
+}
+
 export interface Payment {
   appointmentId: string;
   doctorId: string;
@@ -74,6 +97,7 @@ export interface Payment {
   approvedBy?: string;
   approvedAt?: any;
   transactionHash?: string;
+  escrowStatus?: PaymentEscrowStatus;
 }
 export interface PatientProfile {
   id?: string;

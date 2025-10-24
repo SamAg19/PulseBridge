@@ -13,7 +13,7 @@ import {
   setDoc
 } from 'firebase/firestore';
 import { db } from './config';
-import { Task, Appointment, Payment } from '../types';
+import { Task, Appointment, Payment, MeetingVerification, PaymentEscrowStatus } from '../types';
 
 // ============ TASKS ============
 export const createTask = async (taskData: Omit<Task, 'createdAt'>) => {
@@ -122,8 +122,19 @@ export const updateAppointmentStatus = async (
 // ============ PAYMENTS ============
 export const createPayment = async (paymentData: Omit<Payment, 'createdAt'>) => {
   try {
+    // Initialize escrow status for new payments
+    const escrowStatus: PaymentEscrowStatus = {
+      status: 'held',
+      releaseConditions: {
+        meetingVerified: false,
+        prescriptionDelivered: false,
+        prescriptionVerified: false
+      }
+    };
+
     const docRef = await addDoc(collection(db, 'payments'), {
       ...paymentData,
+      escrowStatus,
       createdAt: serverTimestamp(),
     });
     return { success: true, paymentId: docRef.id };
@@ -667,6 +678,413 @@ export const checkPatientExists = async (walletAddress: string): Promise<boolean
     return profile !== null;
   } catch (error) {
     return false;
+  }
+};
+
+// ============ MEETING VERIFICATION ============
+export const updateMeetingVerification = async (
+  appointmentId: string,
+  participantType: 'doctor' | 'patient',
+  verified: boolean
+) => {
+  try {
+    const appointmentDoc = await getDoc(doc(db, 'appointments', appointmentId));
+    if (!appointmentDoc.exists()) {
+      throw new Error('Appointment not found');
+    }
+
+    const appointment = appointmentDoc.data();
+    const currentVerification = appointment.verification || {
+      doctorVerified: false,
+      patientVerified: false
+    };
+
+    const updates: any = {
+      [`verification.${participantType}Verified`]: verified,
+      updatedAt: serverTimestamp(),
+    };
+
+    if (verified) {
+      updates[`verification.${participantType}VerificationTime`] = serverTimestamp();
+    }
+
+    // Check if both participants have verified
+    const bothVerified = participantType === 'doctor'
+      ? verified && currentVerification.patientVerified
+      : verified && currentVerification.doctorVerified;
+
+    if (bothVerified) {
+      // Update payment status to trigger escrow release
+      updates.paymentStatus = 'completed';
+      
+      // Release payment to doctor via escrow system
+      try {
+        await updatePaymentEscrowStatus(appointmentId, 'meeting_verified');
+      } catch (escrowError) {
+        console.error('Failed to update payment escrow:', escrowError);
+        // Continue with appointment update even if escrow fails
+      }
+    }
+
+    await updateDoc(doc(db, 'appointments', appointmentId), updates);
+    return { success: true, bothVerified };
+  } catch (error: any) {
+    throw new Error(`Failed to update meeting verification: ${error.message}`);
+  }
+};
+
+export const getMeetingVerificationStatus = async (appointmentId: string) => {
+  try {
+    const appointmentDoc = await getDoc(doc(db, 'appointments', appointmentId));
+    if (!appointmentDoc.exists()) {
+      throw new Error('Appointment not found');
+    }
+
+    const appointment = appointmentDoc.data();
+    return appointment.verification || {
+      doctorVerified: false,
+      patientVerified: false
+    };
+  } catch (error: any) {
+    throw new Error(`Failed to get verification status: ${error.message}`);
+  }
+};
+
+export const updatePrescriptionVerification = async (
+  appointmentId: string,
+  verified: boolean
+) => {
+  try {
+    const updates: any = {
+      prescriptionVerified: verified,
+      prescriptionDelivered: verified, // If verified, it means it was delivered
+      updatedAt: serverTimestamp(),
+    };
+
+    if (verified) {
+      updates.prescriptionVerificationTime = serverTimestamp();
+      
+      // Release patient payment via escrow system
+      try {
+        await updatePaymentEscrowStatus(appointmentId, 'prescription_verified');
+      } catch (escrowError) {
+        console.error('Failed to update payment escrow for prescription:', escrowError);
+        // Continue with appointment update even if escrow fails
+      }
+    }
+
+    await updateDoc(doc(db, 'appointments', appointmentId), updates);
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(`Failed to update prescription verification: ${error.message}`);
+  }
+};
+
+export const updateAppointmentPrescriptionVerification = async (
+  appointmentId: string,
+  verificationData: {
+    prescriptionVerified?: boolean;
+    prescriptionDelivered?: boolean;
+    prescriptionVerificationTime?: Date;
+  }
+) => {
+  try {
+    // Get appointment details for logging
+    const appointmentDoc = await getDoc(doc(db, 'appointments', appointmentId));
+    if (!appointmentDoc.exists()) {
+      throw new Error('Appointment not found');
+    }
+    
+    const appointment = appointmentDoc.data();
+    const patientId = appointment.patientId;
+
+    const updates: any = {
+      ...verificationData,
+      updatedAt: serverTimestamp(),
+    };
+
+    if (verificationData.prescriptionVerified) {
+      // Create audit log for prescription verification
+      await createPrescriptionVerificationLog(
+        appointmentId,
+        patientId,
+        'prescription_verified',
+        {
+          verificationTime: verificationData.prescriptionVerificationTime || new Date(),
+          previousStatus: {
+            prescriptionDelivered: appointment.prescriptionDelivered || false,
+            prescriptionVerified: appointment.prescriptionVerified || false
+          }
+        }
+      );
+
+      // Release patient payment via escrow system
+      try {
+        await updatePaymentEscrowStatus(appointmentId, 'prescription_verified');
+      } catch (escrowError) {
+        console.error('Failed to update payment escrow for prescription:', escrowError);
+        // Continue with appointment update even if escrow fails
+      }
+    }
+
+    if (verificationData.prescriptionDelivered && !appointment.prescriptionDelivered) {
+      // Create audit log for prescription delivery
+      await createPrescriptionVerificationLog(
+        appointmentId,
+        patientId,
+        'prescription_delivered',
+        {
+          deliveryTime: new Date(),
+          previousStatus: {
+            prescriptionDelivered: appointment.prescriptionDelivered || false
+          }
+        }
+      );
+    }
+
+    await updateDoc(doc(db, 'appointments', appointmentId), updates);
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(`Failed to update appointment prescription verification: ${error.message}`);
+  }
+};
+
+export const initializeMeetingVerification = async (appointmentId: string) => {
+  try {
+    const updates = {
+      verification: {
+        doctorVerified: false,
+        patientVerified: false
+      },
+      prescriptionDelivered: false,
+      prescriptionVerified: false,
+      updatedAt: serverTimestamp(),
+    };
+
+    await updateDoc(doc(db, 'appointments', appointmentId), updates);
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(`Failed to initialize meeting verification: ${error.message}`);
+  }
+};
+
+// ============ DATABASE MIGRATION ============
+export const migrateExistingAppointments = async () => {
+  try {
+    const querySnapshot = await getDocs(collection(db, 'appointments'));
+    const batch = [];
+    
+    for (const docSnapshot of querySnapshot.docs) {
+      const appointment = docSnapshot.data();
+      
+      // Only update appointments that don't have verification fields
+      if (!appointment.verification) {
+        const updates = {
+          verification: {
+            doctorVerified: false,
+            patientVerified: false
+          },
+          prescriptionDelivered: false,
+          prescriptionVerified: false,
+          updatedAt: serverTimestamp(),
+        };
+        
+        batch.push(updateDoc(doc(db, 'appointments', docSnapshot.id), updates));
+      }
+    }
+    
+    await Promise.all(batch);
+    return { success: true, migratedCount: batch.length };
+  } catch (error: any) {
+    throw new Error(`Failed to migrate appointments: ${error.message}`);
+  }
+};
+
+// ============ PAYMENT ESCROW INTEGRATION ============
+export const initializePaymentEscrow = async (paymentId: string, appointmentId: string) => {
+  try {
+    const escrowStatus: PaymentEscrowStatus = {
+      status: 'held',
+      releaseConditions: {
+        meetingVerified: false,
+        prescriptionDelivered: false,
+        prescriptionVerified: false
+      }
+    };
+
+    await updateDoc(doc(db, 'payments', paymentId), {
+      escrowStatus,
+      updatedAt: serverTimestamp(),
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(`Failed to initialize payment escrow: ${error.message}`);
+  }
+};
+
+export const updatePaymentEscrowStatus = async (
+  appointmentId: string,
+  releaseType: 'meeting_verified' | 'prescription_verified'
+) => {
+  try {
+    // Get the payment for this appointment
+    const paymentsQuery = query(
+      collection(db, 'payments'),
+      where('appointmentId', '==', appointmentId)
+    );
+    const paymentsSnapshot = await getDocs(paymentsQuery);
+    
+    if (paymentsSnapshot.empty) {
+      throw new Error('No payment found for this appointment');
+    }
+
+    const paymentDoc = paymentsSnapshot.docs[0];
+    const payment = paymentDoc.data();
+    const currentEscrow = payment.escrowStatus || {
+      status: 'held',
+      releaseConditions: {
+        meetingVerified: false,
+        prescriptionDelivered: false,
+        prescriptionVerified: false
+      }
+    };
+
+    // Update release conditions
+    const updatedConditions = { ...currentEscrow.releaseConditions };
+    
+    if (releaseType === 'meeting_verified') {
+      updatedConditions.meetingVerified = true;
+    } else if (releaseType === 'prescription_verified') {
+      updatedConditions.prescriptionVerified = true;
+      updatedConditions.prescriptionDelivered = true;
+    }
+
+    // Determine if payment should be released
+    let newStatus = currentEscrow.status;
+    if (releaseType === 'meeting_verified' && updatedConditions.meetingVerified) {
+      newStatus = 'released_to_doctor';
+    } else if (releaseType === 'prescription_verified' && updatedConditions.prescriptionVerified) {
+      newStatus = 'released_to_patient';
+    }
+
+    const updatedEscrow: PaymentEscrowStatus = {
+      ...currentEscrow,
+      status: newStatus,
+      releaseConditions: updatedConditions,
+      releaseTimestamp: newStatus !== 'held' ? serverTimestamp() : currentEscrow.releaseTimestamp
+    };
+
+    await updateDoc(doc(db, 'payments', paymentDoc.id), {
+      escrowStatus: updatedEscrow,
+      status: newStatus === 'released_to_doctor' || newStatus === 'released_to_patient' ? 'completed' : payment.status,
+      updatedAt: serverTimestamp(),
+    });
+
+    return { success: true, escrowStatus: updatedEscrow };
+  } catch (error: any) {
+    throw new Error(`Failed to update payment escrow: ${error.message}`);
+  }
+};
+
+export const getPaymentEscrowStatus = async (appointmentId: string) => {
+  try {
+    const paymentsQuery = query(
+      collection(db, 'payments'),
+      where('appointmentId', '==', appointmentId)
+    );
+    const paymentsSnapshot = await getDocs(paymentsQuery);
+    
+    if (paymentsSnapshot.empty) {
+      return null;
+    }
+
+    const payment = paymentsSnapshot.docs[0].data();
+    return payment.escrowStatus || null;
+  } catch (error: any) {
+    throw new Error(`Failed to get payment escrow status: ${error.message}`);
+  }
+};
+
+export const releaseEscrowPayment = async (
+  appointmentId: string,
+  releaseReason: 'meeting_completed' | 'prescription_delivered' | 'dispute_resolved'
+) => {
+  try {
+    const result = await updatePaymentEscrowStatus(
+      appointmentId,
+      releaseReason === 'meeting_completed' ? 'meeting_verified' : 'prescription_verified'
+    );
+
+    // Log the payment release
+    await addDoc(collection(db, 'payment_logs'), {
+      appointmentId,
+      action: 'escrow_release',
+      reason: releaseReason,
+      timestamp: serverTimestamp(),
+      escrowStatus: result.escrowStatus
+    });
+
+    return result;
+  } catch (error: any) {
+    throw new Error(`Failed to release escrow payment: ${error.message}`);
+  }
+};
+
+// ============ PRESCRIPTION VERIFICATION AUDIT TRAIL ============
+export const createPrescriptionVerificationLog = async (
+  appointmentId: string,
+  patientId: string,
+  action: 'prescription_delivered' | 'prescription_verified',
+  details?: any
+) => {
+  try {
+    await addDoc(collection(db, 'prescription_verification_logs'), {
+      appointmentId,
+      patientId,
+      action,
+      details: details || {},
+      timestamp: serverTimestamp(),
+      createdAt: serverTimestamp()
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(`Failed to create prescription verification log: ${error.message}`);
+  }
+};
+
+export const getPrescriptionVerificationLogs = async (appointmentId: string) => {
+  try {
+    const q = query(
+      collection(db, 'prescription_verification_logs'),
+      where('appointmentId', '==', appointmentId),
+      orderBy('timestamp', 'desc')
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as any[];
+  } catch (error: any) {
+    throw new Error(`Failed to fetch prescription verification logs: ${error.message}`);
+  }
+};
+
+export const getPaymentAuditTrail = async (appointmentId: string) => {
+  try {
+    const q = query(
+      collection(db, 'payment_logs'),
+      where('appointmentId', '==', appointmentId),
+      orderBy('timestamp', 'desc')
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as any[];
+  } catch (error: any) {
+    throw new Error(`Failed to fetch payment audit trail: ${error.message}`);
   }
 };
 

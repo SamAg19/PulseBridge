@@ -25,22 +25,23 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
     IERC20 public immutable usdc;
     IERC20 public immutable usdt;
 
-    uint32 public numSessions;
+    uint256 public numSessions;
     mapping(uint256 => Structs.Session) sessions;
     mapping(address => uint256[]) patientSessions;
     mapping(uint256 => uint256[]) doctorSessions;
-    mapping(uint32 => uint8[]) doctorRatings;
+    mapping(uint256 => uint8[]) doctorRatings;
 
     uint256 public pyUSDReserveBalance;
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    bytes32 public constant EMPTY_STRING_HASH = keccak256(abi.encodePacked(""));
 
     event SessionCreated(
         uint256 indexed sessionId, uint32 indexed doctorId, address indexed patient, uint256 feeUSD, uint256 pyusdAmount
     );
 
     event PaymentReleased(uint256 indexed sessionId, address indexed doctor, uint256 amount);
-    event DoctorRated(uint32 doctorId, uint32 sessionID, uint16 rating);
+    event DoctorRated(uint32 doctorId, uint256 sessionID, uint16 rating);
 
     constructor(address _doctorRegistry, address _pythOracle, address _pyusd, address _usdc, address _usdt) {
         doctorRegistry = IDoctorRegistry(_doctorRegistry);
@@ -64,10 +65,12 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
         uint32 doctorId,
         uint256 consultationPayment,
         bytes[] calldata priceUpdateData,
-        address tokenAddress
+        address tokenAddress,
+        uint256 startTime
     ) external payable {
         Structs.RegStruct memory doctor = doctorRegistry.getDoctor(doctorId);
         require(doctor.doctorAddress != address(0), "Doctor not found");
+        require(startTime > block.timestamp, "Invalid start time");
 
         uint256 updateFee = pythOracle.getUpdateFee(priceUpdateData);
         require(address(this).balance >= updateFee, "Insufficient contract ETH for oracle fee");
@@ -102,16 +105,17 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
 
         pyUSDReserveBalance -= pyusdNeeded;
 
-        uint32 sessionId = ++numSessions;
+        uint256 sessionId = ++numSessions;
 
         sessions[sessionId] = Structs.Session({
             status: uint8(SessionStatus.Active),
             doctorId: doctorId,
             sessionId: sessionId,
             patient: msg.sender,
-            doctorPrescriptionIPFSHash: bytes32(0),
+            doctorPrescriptionIPFSHash: "",
             pyusdAmount: pyusdNeeded,
-            createdAt: block.timestamp
+            createdAt: block.timestamp,
+            startTime: startTime
         });
 
         patientSessions[msg.sender].push(sessionId);
@@ -136,7 +140,7 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
      * @param _sessionID The session ID
      * @param _rating rate your experience.
      */
-    function rateSession(uint32 _sessionID, uint8 _rating) external {
+    function rateSession(uint256 _sessionID, uint8 _rating) external {
         require(_rating <= 100, "Rating needs to between 0-100");
 
         Structs.Session memory session = sessions[_sessionID];
@@ -152,12 +156,14 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
      * @notice Release payment to doctor after session completion (admin only)
      * @param sessionId The session ID
      */
-    function releasePayment(uint256 sessionId, bytes32 ipfsHash) external nonReentrant {
+    function releasePayment(uint256 sessionId, string calldata ipfsHash) external nonReentrant {
         Structs.Session storage session = sessions[sessionId];
         require(session.status == uint8(SessionStatus.Active), "Session not active");
+        require(block.timestamp > session.startTime, "Session not started");
 
         Structs.RegStruct memory doctor = doctorRegistry.getDoctor(session.doctorId);
         require(doctor.doctorAddress == msg.sender, "Invalid doctor caller");
+        require(keccak256(abi.encodePacked(ipfsHash)) != EMPTY_STRING_HASH, "IPFS hash is required");
 
         pyusd.safeTransfer(doctor.doctorAddress, session.pyusdAmount);
 

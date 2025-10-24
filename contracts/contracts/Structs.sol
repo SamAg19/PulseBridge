@@ -11,16 +11,17 @@ library Structs {
         address doctorAddress;
         uint256 consultationFeePerHour;
         uint256 depositFeeStored;
-        bytes32 legalDocumentsIPFSHash;
+        string legalDocumentsIPFSHash;
     }
 
     struct Session {
         uint8 status;
         uint32 doctorId;
-        uint32 sessionId;
+        uint256 sessionId;
         address patient;
-        bytes32 doctorPrescriptionIPFSHash;
+        string doctorPrescriptionIPFSHash;
         uint256 pyusdAmount;         
         uint256 createdAt;
+        uint256 startTime;
     }
 } 

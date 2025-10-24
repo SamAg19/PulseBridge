@@ -137,9 +137,12 @@ export default function HomePage() {
                     Pay securely with crypto
                   </li>
                 </ul>
-                <button className="w-full bg-gray-300 text-gray-500 font-semibold py-3 rounded-xl cursor-not-allowed">
-                  Coming Soon
-                </button>
+                <Link
+                  href="/patient"
+                  className="block w-full btn-primary text-white font-semibold py-3 rounded-xl transition-all duration-300"
+                >
+                  Continue as Patient
+                </Link>
               </div>
             </div>
           </div>

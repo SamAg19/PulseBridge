@@ -225,3 +225,158 @@ export const getDoctorProfile = async (doctorId: string) => {
     throw new Error(`Failed to fetch profile: ${error.message}`);
   }
 };
+
+export const getVerifiedDoctorsWithTasks = async (page: number = 1, limit: number = 6) => {
+  try {
+    // Get verified doctors
+    const doctorsQuery = query(
+      collection(db, 'doctors'),
+      where('verificationStatus', '==', 'approved')
+    );
+    const doctorsSnapshot = await getDocs(doctorsQuery);
+    const doctors = doctorsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as any[];
+
+    // Get tasks for each doctor
+    const doctorsWithTasks = await Promise.all(
+      doctors.map(async (doctor: any) => {
+        const tasksQuery = query(
+          collection(db, 'tasks'),
+          where('doctorId', '==', doctor.id),
+          where('status', '==', 'published')
+        );
+        const tasksSnapshot = await getDocs(tasksQuery);
+        const tasks = tasksSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as any[];
+
+        // Get reviews for rating calculation
+        const reviewsQuery = query(
+          collection(db, 'reviews'),
+          where('doctorId', '==', doctor.id)
+        );
+        const reviewsSnapshot = await getDocs(reviewsQuery);
+        const reviews = reviewsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as any[];
+
+        // Calculate average rating
+        const avgRating = reviews.length > 0 
+          ? reviews.reduce((sum: number, review: any) => sum + review.rating, 0) / reviews.length
+          : 0;
+
+        return {
+          ...doctor,
+          tasks,
+          reviews,
+          rating: avgRating,
+          totalReviews: reviews.length
+        } as any;
+      })
+    );
+
+    // Filter doctors who have published tasks
+    const activeDoctors = doctorsWithTasks.filter((doctor: any) => doctor.tasks.length > 0);
+
+    // Implement pagination
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedDoctors = activeDoctors.slice(startIndex, endIndex);
+
+    return {
+      doctors: paginatedDoctors,
+      totalPages: Math.ceil(activeDoctors.length / limit),
+      currentPage: page,
+      totalDoctors: activeDoctors.length
+    };
+  } catch (error: any) {
+    throw new Error(`Failed to fetch doctors: ${error.message}`);
+  }
+};
+
+export const getDoctorById = async (doctorId: string) => {
+  try {
+    const doctorDoc = await getDoc(doc(db, 'doctors', doctorId));
+    if (!doctorDoc.exists()) {
+      throw new Error('Doctor not found');
+    }
+
+    const doctor = { id: doctorDoc.id, ...doctorDoc.data() } as any;
+
+    // Get doctor's tasks
+    const tasksQuery = query(
+      collection(db, 'tasks'),
+      where('doctorId', '==', doctorId),
+      where('status', '==', 'published')
+    );
+    const tasksSnapshot = await getDocs(tasksQuery);
+    const tasks = tasksSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as any[];
+
+    // Get reviews
+    const reviewsQuery = query(
+      collection(db, 'reviews'),
+      where('doctorId', '==', doctorId)
+    );
+    const reviewsSnapshot = await getDocs(reviewsQuery);
+    const reviews = reviewsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as any[];
+
+    return {
+      ...doctor,
+      tasks,
+      reviews
+    } as any;
+  } catch (error: any) {
+    throw new Error(`Failed to fetch doctor: ${error.message}`);
+  }
+};
+
+export const getAppointmentsByPatient = async (patientId: string) => {
+  try {
+    const q = query(
+      collection(db, 'appointments'),
+      where('patientId', '==', patientId),
+      orderBy('scheduledDate', 'desc')
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as any[];
+  } catch (error: any) {
+    throw new Error(`Failed to fetch patient appointments: ${error.message}`);
+  }
+};
+
+export const createReview = async (reviewData: any) => {
+  try {
+    const docRef = await addDoc(collection(db, 'reviews'), {
+      ...reviewData,
+      createdAt: serverTimestamp(),
+    });
+    return { success: true, reviewId: docRef.id };
+  } catch (error: any) {
+    throw new Error(`Failed to create review: ${error.message}`);
+  }
+};
+
+export const getTaskById = async (taskId: string) => {
+  try {
+    const taskDoc = await getDoc(doc(db, 'tasks', taskId));
+    if (!taskDoc.exists()) {
+      throw new Error('Task not found');
+    }
+    return { id: taskDoc.id, ...taskDoc.data() };
+  } catch (error: any) {
+    throw new Error(`Failed to fetch task: ${error.message}`);
+  }
+};

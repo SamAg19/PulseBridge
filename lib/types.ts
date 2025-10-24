@@ -1,22 +1,30 @@
 export interface DoctorProfile {
+  id?: string;
   email: string;
   fullName: string;
   specialization: string;
   licenseNumber: string;
   verificationStatus: 'pending' | 'approved' | 'rejected';
   walletAddress?: string;
+  profilePicture?: string;
+  bio?: string;
+  experience?: number;
+  rating?: number;
+  totalReviews?: number;
+  consultationFee?: number;
   createdAt: any;
   updatedAt: any;
 }
 
 export interface Task {
+  id?: string;
   doctorId: string;
   title: string;
   description: string;
   category: 'consultation' | 'procedure' | 'followup';
   duration: number;
   fee: number;
-  currency: 'PYUSD';
+  currency: 'ETH' | 'PYUSD';
   status: 'draft' | 'published' | 'archived';
   dateTimeSlots: TimeSlot[];
   createdAt: any;
@@ -52,4 +60,27 @@ export interface Payment {
   approvedBy?: string;
   approvedAt?: any;
   transactionHash?: string;
+}
+export interface PatientProfile {
+  id?: string;
+  email: string;
+  fullName: string;
+  walletAddress?: string;
+  createdAt: any;
+  updatedAt: any;
+}
+
+export interface Review {
+  id?: string;
+  doctorId: string;
+  patientId: string;
+  appointmentId: string;
+  rating: number;
+  comment: string;
+  createdAt: any;
+}
+
+export interface DoctorWithTasks extends DoctorProfile {
+  tasks: Task[];
+  reviews: Review[];
 }

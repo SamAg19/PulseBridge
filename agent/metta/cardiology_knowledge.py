@@ -30,13 +30,6 @@ class CardiologyKnowledge:
     def _initialize_knowledge(self):
         """
         Initialize cardiology knowledge base with 30+ medical reasoning rules
-
-        Knowledge categories:
-        1. Symptom-to-condition mappings (Rules 1-8)
-        2. Risk factor amplifications (Rules 9-14)
-        3. Urgency scoring (Rules 15-20)
-        4. Confidence modifiers (Rules 21-25)
-        5. Recommendations (Rules 26-30)
         """
 
         # SYMPTOM-TO-CONDITION MAPPINGS

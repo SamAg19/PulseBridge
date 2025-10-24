@@ -16,6 +16,7 @@ import time
 import logging
 from services.doctor_matcher import get_doctor_matcher
 from agents.cardiology_agent import get_cardiology_agent
+from agents.triage_agent import get_triage_agent
 
 logger = logging.getLogger(__name__)
 
@@ -92,60 +93,75 @@ async def analyze_symptoms(request: SymptomAnalysisRequest):
     start_time = time.time()
 
     try:
-        # Phase 3: Use real MeTTa-powered Cardiology agent
-        cardiology_agent = get_cardiology_agent()
+        # Phase 4: Use real MeTTa-powered Triage agent for routing
+        triage_agent = get_triage_agent()
 
-        # Run Cardiology agent analysis with real MeTTa reasoning
-        cardiology_analysis = await cardiology_agent.analyze(
+        # Step 1: Triage agent routes symptoms to appropriate specialty
+        triage_analysis, recommended_specialty = await triage_agent.analyze(
             symptoms=request.symptoms,
             patient_age=request.patient_age,
             patient_gender=request.patient_gender,
             medical_history=request.medical_history
         )
 
-        logger.info(f"Cardiology agent completed analysis: {cardiology_analysis.confidence_score} confidence")
+        logger.info(f"Triage agent routed to: {recommended_specialty} (confidence: {triage_analysis.confidence_score})")
 
-        # Extract recommended specialization from analysis
-        recommended_specialization = "Cardiology"  # For now, always cardiology (will add triage agent in Phase 4)
+        # Step 2: Route to appropriate specialist agent
+        # For now, we only have Cardiology implemented (Neurology/Dermatology in Phase 8)
+        specialist_analysis = None
 
-        # Query real doctors from blockchain
+        if recommended_specialty.lower() == "cardiology":
+            cardiology_agent = get_cardiology_agent()
+            specialist_analysis = await cardiology_agent.analyze(
+                symptoms=request.symptoms,
+                patient_age=request.patient_age,
+                patient_gender=request.patient_gender,
+                medical_history=request.medical_history
+            )
+            logger.info(f"Cardiology agent completed analysis: {specialist_analysis.confidence_score} confidence")
+        else:
+            # For non-cardiology specialties not yet implemented, route to cardiology as fallback
+            logger.warning(f"{recommended_specialty} agent not yet implemented, using cardiology fallback")
+            cardiology_agent = get_cardiology_agent()
+            specialist_analysis = await cardiology_agent.analyze(
+                symptoms=request.symptoms,
+                patient_age=request.patient_age,
+                patient_gender=request.patient_gender,
+                medical_history=request.medical_history
+            )
+            recommended_specialty = "cardiology"
+
+        # Step 3: Query real doctors from blockchain
         matcher = get_doctor_matcher()
-        matching_doctors = await matcher.find_doctors(recommended_specialization)
+        # Capitalize for doctor search
+        specialty_search = recommended_specialty.title()
+        matching_doctors = await matcher.find_doctors(specialty_search)
 
-        logger.info(f"Found {len(matching_doctors)} doctors for {recommended_specialization}")
+        logger.info(f"Found {len(matching_doctors)} doctors for {specialty_search}")
 
-        # Generate preliminary diagnosis from Cardiology analysis
-        preliminary_diagnosis = cardiology_analysis.analysis
+        # Generate preliminary diagnosis from specialist analysis
+        preliminary_diagnosis = specialist_analysis.analysis
 
-        # Create mock triage agent (will be real in Phase 4)
-        triage_analysis = AgentAnalysis(
-            agent_name="Triage Coordinator",
-            agent_role="triage",
-            analysis=f"Patient symptoms indicate potential cardiac issue. Routing to cardiology specialist for detailed assessment. {len(matching_doctors)} cardiologists available.",
-            confidence_score=0.75,
-            risk_level=cardiology_analysis.risk_level,
-            recommendations=[
-                "Route to cardiology specialist",
-                "Assess urgency level based on symptom severity"
-            ],
-            processing_time_ms=50
-        )
+        # Generate consensus reasoning showing multi-agent collaboration
+        consensus_reasoning = f"Multi-agent collaboration: Triage agent (MeTTa routing: {triage_analysis.metta_reasoning.matched_rules if triage_analysis.metta_reasoning else 0} rules) "
+        consensus_reasoning += f"routed to {recommended_specialty.title()} with {triage_analysis.confidence_score:.0%} confidence. "
+        consensus_reasoning += f"\n\n{recommended_specialty.title()} specialist (MeTTa reasoning: {specialist_analysis.metta_reasoning.matched_rules if specialist_analysis.metta_reasoning else 0} rules) "
+        consensus_reasoning += f"identified {specialist_analysis.confidence_score:.0%} probability of condition requiring attention. "
+        consensus_reasoning += f"\n\nUrgency level: {specialist_analysis.risk_level}. "
+        consensus_reasoning += f"Consensus: Patient should consult {recommended_specialty.title()} specialist. {len(matching_doctors)} qualified specialists available."
 
-        # Generate consensus reasoning
-        consensus_reasoning = f"After collaborative analysis, Cardiology specialist (MeTTa-powered) identified {cardiology_analysis.confidence_score:.0%} probability of {preliminary_diagnosis.split('suggest possible ')[1].split('.')[0] if 'suggest possible' in preliminary_diagnosis else 'cardiac condition'}. "
-        consensus_reasoning += f"MeTTa reasoning matched {cardiology_analysis.metta_reasoning.matched_rules if cardiology_analysis.metta_reasoning else 0} medical rules. "
-        consensus_reasoning += f"Urgency level: {cardiology_analysis.risk_level}. "
-        consensus_reasoning += f"Consensus: Primary concern is cardiovascular, requiring specialist consultation."
+        # Build agent collaboration dict
+        agent_collaboration = {
+            "triage": triage_analysis,
+            recommended_specialty.lower(): specialist_analysis  # Dynamic key based on routed specialty
+        }
 
         response = SymptomAnalysisResponse(
             preliminary_diagnosis=preliminary_diagnosis,
-            recommended_specialization=recommended_specialization,
-            urgency_level=cardiology_analysis.risk_level,
-            overall_confidence=cardiology_analysis.confidence_score,
-            agent_collaboration={
-                "triage": triage_analysis,
-                "cardiology": cardiology_analysis  # Real MeTTa-powered analysis!
-            },
+            recommended_specialization=specialty_search,  # Properly capitalized
+            urgency_level=specialist_analysis.risk_level,
+            overall_confidence=specialist_analysis.confidence_score,
+            agent_collaboration=agent_collaboration,
             consensus_reasoning=consensus_reasoning,
             available_doctors=matching_doctors,
             total_doctors_found=len(matching_doctors),

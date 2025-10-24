@@ -11,7 +11,7 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
     using SafeERC20 for IERC20;
 
     mapping(uint32 => Structs.RegStruct) ApprovedRegistry;
-    mapping(uint256 => Structs.RegStruct) PendingRegistry;
+    mapping(address => Structs.RegStruct) PendingRegistry;
     mapping(address => uint32 docID) RegisteredDoctor;
 
     address public depositToken;
@@ -22,11 +22,11 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
     bytes32 public constant APPROVER = keccak256("APPROVER");
     bytes32 public constant EMPTY_STRING_HASH = keccak256(abi.encodePacked(""));
 
-    event PendingRegistration(uint32 docID);
+    event PendingRegistration(address docAddress);
     event DepositFeeChanged(uint256 oldFee, uint256 newFee);
-    event DoctorRegistered(uint32 docID);
-    event DoctorApproved(uint32 docID);
-    event DoctorDenied(uint32 docID);
+    event DoctorRegistered(address docAddress, uint32 docID);
+    event DoctorApproved(address docAddress, uint32 docID);
+    event DoctorDenied(address pendingDocAddr);
 
     constructor(address _owner, uint256 _depositFee, uint256 _stakeAmount, address _depositToken) {
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
@@ -51,10 +51,12 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
         uint256 consultationFees,
         string calldata legalDocumentsIPFSHash
     ) public {
-        require(keccak256(abi.encodePacked(legalDocumentsIPFSHash)) != EMPTY_STRING_HASH, "Legal documents IPFS hash is required!");
+        require(
+            keccak256(abi.encodePacked(legalDocumentsIPFSHash)) != EMPTY_STRING_HASH,
+            "Legal documents IPFS hash is required!"
+        );
 
-        numDoctors++;
-        PendingRegistry[numDoctors] = Structs.RegStruct({
+        PendingRegistry[msg.sender] = Structs.RegStruct({
             Name: name,
             specialization: specialization,
             profileDescription: profileDescription,
@@ -68,30 +70,34 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
         totalPYUsdToBeCollected += depositFee;
 
         IERC20(depositToken).transferFrom(msg.sender, address(this), stakeAmount);
-        emit PendingRegistration(numDoctors);
+        emit PendingRegistration(msg.sender);
     }
 
     /**
      * @notice Approves an doctor and turns him into an ActiveDoctor
-     * @param _docID the doctor that gets approved.
+     * @param _pendingDoctor the doctor that gets approved.
      */
-    function approveDoctor(uint32 _docID) public onlyRole(APPROVER) {
-        Structs.RegStruct memory Docreg = getPendingDoctor(_docID);
-        ApprovedRegistry[_docID] = Docreg;
-        RegisteredDoctor[Docreg.doctorAddress] = _docID;
+    function approveDoctor(address _pendingDoctor) public onlyRole(APPROVER) {
+        Structs.RegStruct memory Docreg = getPendingDoctor(_pendingDoctor);
+
+        numDoctors++;
+
+        ApprovedRegistry[numDoctors] = Docreg;
+
+        RegisteredDoctor[Docreg.doctorAddress] = numDoctors;
         IERC20(depositToken).transfer(Docreg.doctorAddress, stakeAmount - Docreg.depositFeeStored);
-        emit DoctorApproved(numDoctors);
+        emit DoctorApproved(_pendingDoctor, numDoctors);
     }
 
     /**
      * @notice Approves an doctor and turns him into an ActiveDoctor
-     * @param _docID the doctor that gets approved.
+     * @param _pendingDoctor the doctor that gets approved.
      */
-    function denyDoctor(uint32 _docID) public onlyRole(APPROVER) {
-        Structs.RegStruct memory Docreg = getPendingDoctor(_docID);
+    function denyDoctor(address _pendingDoctor) public onlyRole(APPROVER) {
+        Structs.RegStruct memory Docreg = getPendingDoctor(_pendingDoctor);
         totalPYUsdToBeCollected += stakeAmount - Docreg.depositFeeStored;
-        delete PendingRegistry[_docID];
-        emit DoctorDenied(_docID);
+        delete PendingRegistry[msg.sender];
+        emit DoctorDenied(_pendingDoctor);
     }
 
     /**
@@ -130,9 +136,9 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
 
     /**
      * @notice returns an NON-APPROVED doctor
-     * @param _docID the specific NON-APPROVED doctor you want returned.
+     * @param _pendingDoctor the specific NON-APPROVED doctor you want returned.
      */
-    function getPendingDoctor(uint32 _docID) public view returns (Structs.RegStruct memory DS) {
-        return PendingRegistry[_docID];
+    function getPendingDoctor(address _pendingDoctor) public view returns (Structs.RegStruct memory DS) {
+        return PendingRegistry[_pendingDoctor];
     }
 }

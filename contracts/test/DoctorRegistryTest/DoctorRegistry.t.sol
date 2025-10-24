@@ -54,9 +54,7 @@ contract DoctorRegistryTest is Test {
         vm.startPrank(alice);
         PYUSD.approve(address(DocReg), currentStakeAmount);
         vm.expectRevert("Legal documents IPFS hash is required!");
-        DocReg.registerAsDoctor(
-            "Alice", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, ""
-        );
+        DocReg.registerAsDoctor("Alice", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, "");
 
         DocReg.registerAsDoctor(
             "Alice", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, validDocIPFSHash
@@ -73,7 +71,7 @@ contract DoctorRegistryTest is Test {
             validDocIPFSHash
         );
 
-        assertEq(keccak256(abi.encode(ExpectedReturn)), keccak256(abi.encode(DocReg.getPendingDoctor(1))));
+        assertEq(keccak256(abi.encode(ExpectedReturn)), keccak256(abi.encode(DocReg.getPendingDoctor(alice))));
         uint256 balanceAfter = PYUSD.balanceOf(alice);
 
         assertEq(balanceBefore - currentStakeAmount, balanceAfter);
@@ -86,7 +84,7 @@ contract DoctorRegistryTest is Test {
 
         vm.startPrank(alice);
         vm.expectRevert();
-        DocReg.approveDoctor(1);
+        DocReg.approveDoctor(alice);
 
         PYUSD.approve(address(DocReg), currentStakeAmount);
         DocReg.registerAsDoctor(
@@ -95,9 +93,9 @@ contract DoctorRegistryTest is Test {
 
         vm.startPrank(approver);
         vm.expectEmit(true, true, true, true);
-        emit DoctorRegistry.DoctorApproved(1);
+        emit DoctorRegistry.DoctorApproved(alice, 1);
 
-        DocReg.approveDoctor(1);
+        DocReg.approveDoctor(alice);
 
         Structs.RegStruct memory ExpectedReturn = Structs.RegStruct(
             "Alice",
@@ -123,13 +121,13 @@ contract DoctorRegistryTest is Test {
         uint256 balanceBefore = PYUSD.balanceOf(alice);
 
         vm.expectRevert();
-        DocReg.denyDoctor(1);
+        DocReg.denyDoctor(alice);
 
         vm.startPrank(approver);
         vm.expectEmit(true, true, true, true);
-        emit DoctorRegistry.DoctorDenied(1);
+        emit DoctorRegistry.DoctorDenied(alice);
 
-        DocReg.denyDoctor(1);
+        DocReg.denyDoctor(alice);
 
         Structs.RegStruct memory ExpectedReturn = Structs.RegStruct(
             "Alice",

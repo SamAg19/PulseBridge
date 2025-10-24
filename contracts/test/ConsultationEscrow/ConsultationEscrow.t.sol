@@ -26,7 +26,8 @@ contract ConsultationEscrowTest is Test {
     uint256 depositFee = 1e6;
     uint256 stakeAmount = 5e6;
 
-    string profileDescription = "Experienced mental health therapist specializing in cognitive behavioral therapy and mindfulness techniques.";
+    string profileDescription =
+        "Experienced mental health therapist specializing in cognitive behavioral therapy and mindfulness techniques.";
     string email = "alice@example.com";
     string validDocIPFSHashStr = "validDocumentsHash";
     uint256 startTime;
@@ -59,11 +60,13 @@ contract ConsultationEscrowTest is Test {
         PYUSD.faucet(10e6);
 
         PYUSD.approve(address(DocReg), stakeAmount);
-        DocReg.registerAsDoctor("Alice", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, validDocIPFSHashStr);
+        DocReg.registerAsDoctor(
+            "Alice", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, validDocIPFSHashStr
+        );
 
         vm.startPrank(admin);
         DocReg.grantRole(keccak256("APPROVER"), admin);
-        DocReg.approveDoctor(1);
+        DocReg.approveDoctor(doctor);
         _;
     }
 
@@ -73,11 +76,13 @@ contract ConsultationEscrowTest is Test {
         PYUSD.faucet(10e6);
 
         PYUSD.approve(address(DocReg), stakeAmount);
-        DocReg.registerAsDoctor("Alice", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, validDocIPFSHashStr);
+        DocReg.registerAsDoctor(
+            "Alice", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, validDocIPFSHashStr
+        );
 
         vm.startPrank(admin);
         DocReg.grantRole(keccak256("APPROVER"), admin);
-        DocReg.approveDoctor(1);
+        DocReg.approveDoctor(doctor);
 
         startTime = block.timestamp + 1 hours;
 

@@ -6,9 +6,11 @@ import { useReadContract, useChainId, useConfig, useAccount, useWriteContract } 
 import Link from 'next/link';
 import { registerDoctorWithWallet, checkDoctorRegistration } from '@/lib/firebase/auth';
 import { DoctorProfile } from '@/lib/types';
-import { readContract } from "@wagmi/core"
-import { stringToHex, padHex, formatUnits } from 'viem'
-import { chains, DoctorRegistry, erc20Abi } from "@/lib/constants"
+import { readContract, waitForTransactionReceipt, type WriteContractReturnType, getBalance } from "@wagmi/core"
+import { parseEther, formatEther, stringToHex, padHex, formatUnits } from 'viem'
+import { chains, DoctorRegistry, ConsultationEscrow, erc20Abi } from "@/lib/constants"
+import { writeContractSync } from 'viem/actions';
+import { StringDecoder } from 'node:string_decoder';
 
 
 export default function DoctorRegisterPage() {
@@ -59,6 +61,7 @@ export default function DoctorRegisterPage() {
             const cid = await uploadRequest.json();
             setUrl(cid);
             setFormData({ ...formData, licenseNumber: cid });
+            console.log("Uploaded file!: ", cid)
             setUploading(false);
 
 
@@ -83,14 +86,14 @@ export default function DoctorRegisterPage() {
         // Check if doctor is already registered
         const checkRegistration = async () => {
 
-            if (!address) {
+            if (address) {
                 try {
-                    //backend stuff.
-                    const data = await checkDoctorRegistration(String(address));
+                    const email = await checkDoctorRegistration(String(address));
                     const isDoc = await getDoctor();
-                    if (isDoc && data) {
 
-                        if (isDoc != 0) {
+                    if (String(email) != "") {
+
+                        if (email || isDoc) {
                             router.push('/dashboard');
                         } else {
                             router.push('/doctor/pending');
@@ -98,7 +101,7 @@ export default function DoctorRegisterPage() {
                         return;
                     }
                 } catch (error) {
-                    // Doctor not registered, continue with registration
+                    // Doctor not registered, continue with registration.
                     console.log('Doctor not registered, continuing with registration');
                 }
             }
@@ -110,19 +113,22 @@ export default function DoctorRegisterPage() {
     }, [address, isConnected, router]);
 
 
-    async function getDoctor(): Promise<Number> {
+    async function getDoctor(): Promise<String> {
 
         if (!address || !address.startsWith('0x') || address.length !== 42) {
             throw new Error('Invalid address format')
         }
 
-        const isDoctor = await readContract(config, {
+        const isDoctor: any = await readContract(config, {
             abi: DoctorRegistry,
             address: DocRegistry as `0x${string}`,
-            functionName: 'getDoctorID',
+            functionName: 'getPendingDoctor',
             args: [address as `0x${string}`],
         })
-        return Number(isDoctor)
+
+
+
+        return String(String(isDoctor[3]))
     }
 
     async function getFees(): Promise<[number, number]> {
@@ -199,7 +205,7 @@ export default function DoctorRegisterPage() {
 
 
     async function registerAsDoctor() {
-        const licenseNumberBytes32 = padHex(stringToHex(formData.licenseNumber), { size: 32 });
+
 
         await getApprovedPYUSD();
 

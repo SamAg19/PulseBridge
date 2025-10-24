@@ -212,7 +212,7 @@ export default function DoctorRegisterPage() {
                 formData.profileDescription,
                 formData.email,
                 formData.consultationfee,
-                formData.licenseNumber, // fix this..
+                formData.licenseNumber,
             ],
 
         })

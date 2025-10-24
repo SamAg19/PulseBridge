@@ -80,16 +80,35 @@ export default function PatientDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-light-blue">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="glass-card border-b border-blue-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Healthcare Platform</h1>
-              <p className="text-gray-600">Find and book appointments with verified doctors</p>
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-primary">Healthcare Platform</h1>
+                <p className="text-secondary">Find and book appointments with verified doctors</p>
+              </div>
             </div>
             <div className="flex items-center space-x-4">
+              <a 
+                href="/patient/appointments" 
+                className="px-4 py-2 text-secondary hover:text-primary transition font-medium"
+              >
+                My Appointments
+              </a>
+              <a 
+                href="/patient/payments" 
+                className="px-4 py-2 text-secondary hover:text-primary transition font-medium"
+              >
+                Payment History
+              </a>
               <ConnectButton />
             </div>
           </div>
@@ -99,8 +118,8 @@ export default function PatientDashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Filters */}
         <div className="mb-8">
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Filter by Specialization</h2>
+          <div className="glass-card rounded-xl p-6 border border-blue-200">
+            <h2 className="text-lg font-semibold text-primary mb-4">Filter by Specialization</h2>
             <div className="flex flex-wrap gap-2">
               {specializations.map((spec) => (
                 <button
@@ -109,7 +128,7 @@ export default function PatientDashboard() {
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                     selectedSpecialization === spec || (spec === 'All Specializations' && !selectedSpecialization)
                       ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                   }`}
                 >
                   {spec}
@@ -121,20 +140,18 @@ export default function PatientDashboard() {
 
         {/* Stats */}
         <div className="mb-8">
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-blue-600">{totalDoctors}</div>
-                <div className="text-gray-600">Verified Doctors</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-green-600">24/7</div>
-                <div className="text-gray-600">Available Support</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-purple-600">0.001 ETH</div>
-                <div className="text-gray-600">Starting From</div>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="glass-card rounded-xl p-6 border border-blue-200">
+              <h3 className="text-lg font-semibold text-primary mb-2">Verified Doctors</h3>
+              <p className="text-3xl font-bold text-blue-600">{totalDoctors}</p>
+            </div>
+            <div className="glass-card rounded-xl p-6 border border-blue-200">
+              <h3 className="text-lg font-semibold text-primary mb-2">Available Support</h3>
+              <p className="text-3xl font-bold text-blue-500">24/7</p>
+            </div>
+            <div className="glass-card rounded-xl p-6 border border-blue-200">
+              <h3 className="text-lg font-semibold text-primary mb-2">Starting From</h3>
+              <p className="text-3xl font-bold text-blue-400">0.001 ETH</p>
             </div>
           </div>
         </div>

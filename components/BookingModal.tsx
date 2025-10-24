@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseEther } from 'viem';
+import { useAccount } from 'wagmi';
 import { DoctorProfile, Task, TimeSlot } from '@/lib/types';
 import { createAppointment } from '@/lib/firebase/firestore';
 
@@ -21,19 +20,7 @@ export default function BookingModal({ doctor, task, isOpen, onClose, onSuccess 
   const [step, setStep] = useState<'select' | 'confirm' | 'payment' | 'success'>('select');
   const [appointmentId, setAppointmentId] = useState<string | null>(null);
 
-  const { writeContract, data: hash, error, isPending } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash,
-  });
 
-  useEffect(() => {
-    if (isConfirmed && appointmentId) {
-      setStep('success');
-      setTimeout(() => {
-        onSuccess();
-      }, 2000);
-    }
-  }, [isConfirmed, appointmentId, onSuccess]);
 
   useEffect(() => {
     if (isOpen) {
@@ -112,17 +99,14 @@ export default function BookingModal({ doctor, task, isOpen, onClose, onSuccess 
   };
 
   const handlePayment = async () => {
-    if (!doctor.walletAddress || !selectedSlot) return;
-
     try {
-      // Send ETH directly to doctor's wallet
-      writeContract({
-        address: doctor.walletAddress as `0x${string}`,
-        abi: [],
-        functionName: '',
-        args: [],
-        value: parseEther(task.fee.toString()),
-      });
+      // Bypass actual payment processing for now
+      // Simulate successful payment
+      setStep('success');
+      
+      // Optional: Update appointment status to confirmed
+      // This would normally happen after successful payment
+      console.log('Payment bypassed - appointment created successfully');
     } catch (error) {
       console.error('Payment error:', error);
       alert('Payment failed. Please try again.');
@@ -225,23 +209,21 @@ export default function BookingModal({ doctor, task, isOpen, onClose, onSuccess 
                 </svg>
               </div>
               <p className="text-gray-600 mb-4">
-                Your appointment has been created. Complete the payment to confirm your booking.
+                Your appointment has been created. Click "Complete Booking" to confirm your appointment.
               </p>
-              <div className="text-2xl font-bold text-blue-600 mb-6">{formatFee(task.fee)}</div>
+              <div className="text-2xl font-bold text-blue-600 mb-2">{formatFee(task.fee)}</div>
+              <div className="text-sm text-gray-500 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                💡 Payment processing is currently bypassed for testing
+              </div>
             </div>
 
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-                <p className="text-red-700 text-sm">Payment failed. Please try again.</p>
-              </div>
-            )}
+
 
             <button
               onClick={handlePayment}
-              disabled={isPending || isConfirming}
-              className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 font-medium"
+              className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
             >
-              {isPending ? 'Initiating Payment...' : isConfirming ? 'Confirming Payment...' : 'Pay Now'}
+              Complete Booking
             </button>
           </div>
         );
@@ -261,8 +243,8 @@ export default function BookingModal({ doctor, task, isOpen, onClose, onSuccess 
             <div className="bg-blue-50 rounded-lg p-4 mb-4">
               <p className="text-sm text-blue-800">
                 <strong>Next Steps:</strong><br />
-                • You'll receive a Jitsi meeting link via email<br />
-                • The meeting will be tracked by our AI agent<br />
+                • Admin will provide a meeting link for your appointment<br />
+                • Meeting attendance will be tracked to verify both participants<br />
                 • You can leave a review after the consultation
               </p>
             </div>

@@ -46,7 +46,21 @@ export interface Appointment {
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
   paymentStatus: 'pending_approval' | 'approved' | 'completed';
   paymentAmount: number;
+  meetingLink?: string;
+  meetingId?: string;
+  attendanceTracking?: AttendanceTracking;
   createdAt: any;
+}
+
+export interface AttendanceTracking {
+  doctorJoined: boolean;
+  patientJoined: boolean;
+  doctorJoinTime?: any;
+  patientJoinTime?: any;
+  meetingStartTime?: any;
+  meetingEndTime?: any;
+  meetingDuration?: number; // in minutes
+  bothParticipantsPresent: boolean;
 }
 
 export interface Payment {
@@ -78,6 +92,25 @@ export interface Review {
   rating: number;
   comment: string;
   createdAt: any;
+}
+
+export interface Prescription {
+  id?: string;
+  appointmentId: string;
+  doctorId: string;
+  patientId: string;
+  medications: Medication[];
+  instructions: string;
+  notes?: string;
+  createdAt: any;
+}
+
+export interface Medication {
+  name: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  instructions?: string;
 }
 
 export interface DoctorWithTasks extends DoctorProfile {

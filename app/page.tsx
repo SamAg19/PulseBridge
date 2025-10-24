@@ -143,6 +143,15 @@ export default function HomePage() {
                 >
                   Continue as Patient
                 </Link>
+                
+                <div className="mt-4 text-center">
+                  <Link
+                    href="/admin"
+                    className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                  >
+                    Admin Access
+                  </Link>
+                </div>
               </div>
             </div>
           </div>

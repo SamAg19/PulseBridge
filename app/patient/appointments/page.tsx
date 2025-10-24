@@ -3,12 +3,15 @@
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { getAppointmentsByPatient, getDoctorById } from '@/lib/firebase/firestore';
+import { getAppointmentsByPatient, getDoctorById, getReviewsByAppointment, getPrescriptionsByAppointment } from '@/lib/firebase/firestore';
 import { Appointment, DoctorProfile } from '@/lib/types';
+import ReviewModal from '@/components/ReviewModal';
 
 interface AppointmentWithDoctor extends Appointment {
   id?: string;
   doctor?: DoctorProfile;
+  hasReview?: boolean;
+  hasPrescription?: boolean;
 }
 
 export default function PatientAppointments() {
@@ -16,6 +19,17 @@ export default function PatientAppointments() {
   const [appointments, setAppointments] = useState<AppointmentWithDoctor[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'confirmed' | 'completed' | 'cancelled'>('all');
+  const [reviewModal, setReviewModal] = useState<{
+    isOpen: boolean;
+    appointmentId: string;
+    doctorId: string;
+    doctorName: string;
+  }>({
+    isOpen: false,
+    appointmentId: '',
+    doctorId: '',
+    doctorName: ''
+  });
 
   useEffect(() => {
     if (isConnected && address) {
@@ -30,14 +44,24 @@ export default function PatientAppointments() {
       setLoading(true);
       const appointmentsData = await getAppointmentsByPatient(address);
 
-      // Fetch doctor details for each appointment
+      // Fetch doctor details, reviews, and prescriptions for each appointment
       const appointmentsWithDoctors = await Promise.all(
         appointmentsData.map(async (appointment: any) => {
           try {
-            const doctor = await getDoctorById(appointment.doctorId);
-            return { ...appointment, doctor } as AppointmentWithDoctor;
+            const [doctor, reviews, prescriptions] = await Promise.all([
+              getDoctorById(appointment.doctorId),
+              getReviewsByAppointment(appointment.id),
+              getPrescriptionsByAppointment(appointment.id)
+            ]);
+
+            return {
+              ...appointment,
+              doctor,
+              hasReview: reviews.length > 0,
+              hasPrescription: prescriptions.length > 0
+            } as AppointmentWithDoctor;
           } catch (error) {
-            console.error('Error fetching doctor:', error);
+            console.error('Error fetching appointment details:', error);
             return appointment as AppointmentWithDoctor;
           }
         })
@@ -106,6 +130,20 @@ export default function PatientAppointments() {
     });
   };
 
+  const handleLeaveReview = (appointmentId: string, doctorId: string, doctorName: string) => {
+    setReviewModal({
+      isOpen: true,
+      appointmentId,
+      doctorId,
+      doctorName
+    });
+  };
+
+  const handleReviewSuccess = () => {
+    // Refresh appointments to update review status
+    fetchAppointments();
+  };
+
   if (!isConnected) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -126,21 +164,27 @@ export default function PatientAppointments() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-light-blue">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="glass-card border-b border-blue-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">My Appointments</h1>
-              <p className="text-gray-600">Manage your healthcare appointments</p>
+              <h1 className="text-2xl font-bold text-primary">My Appointments</h1>
+              <p className="text-secondary">Manage your healthcare appointments</p>
             </div>
             <div className="flex items-center space-x-4">
               <a
                 href="/patient"
-                className="px-4 py-2 text-blue-600 hover:text-blue-700 font-medium"
+                className="px-4 py-2 text-secondary hover:text-primary transition font-medium"
               >
                 Book New Appointment
+              </a>
+              <a
+                href="/patient/payments"
+                className="px-4 py-2 text-secondary hover:text-primary transition font-medium"
+              >
+                Payment History
               </a>
               <ConnectButton />
             </div>
@@ -151,8 +195,8 @@ export default function PatientAppointments() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Filters */}
         <div className="mb-8">
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Filter Appointments</h2>
+          <div className="glass-card rounded-xl p-6 border border-blue-200">
+            <h2 className="text-lg font-semibold text-primary mb-4">Filter Appointments</h2>
             <div className="flex flex-wrap gap-2">
               {[
                 { key: 'all', label: 'All Appointments' },
@@ -165,8 +209,8 @@ export default function PatientAppointments() {
                   key={filterOption.key}
                   onClick={() => setFilter(filterOption.key as any)}
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${filter === filterOption.key
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                     }`}
                 >
                   {filterOption.label}
@@ -194,11 +238,11 @@ export default function PatientAppointments() {
         ) : filteredAppointments.length > 0 ? (
           <div className="space-y-4">
             {filteredAppointments.map((appointment, index) => (
-              <div key={appointment.id || index} className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow">
+              <div key={appointment.id || index} className="glass-card rounded-xl p-6 hover:shadow-xl transition-all duration-300 border border-blue-200 transform hover:scale-105">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start space-x-4">
                     {/* Doctor Avatar */}
-                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-lg">
+                    <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-lg">
                       {appointment.doctor ?
                         appointment.doctor.fullName.split(' ').map(n => n[0]).join('').toUpperCase() :
                         'Dr'
@@ -207,7 +251,7 @@ export default function PatientAppointments() {
 
                     {/* Appointment Details */}
                     <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900">
+                      <h3 className="text-lg font-semibold text-primary">
                         Dr. {appointment.doctor?.fullName || 'Unknown Doctor'}
                       </h3>
                       <p className="text-blue-600 font-medium">
@@ -247,6 +291,25 @@ export default function PatientAppointments() {
                             {appointment.paymentStatus.replace('_', ' ')}
                           </span>
                         </div>
+
+                        {appointment.status === 'confirmed' && (
+                          <div>
+                            <div className="flex items-center text-sm text-gray-600 mb-1">
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                              Meeting
+                            </div>
+                            <div className="font-medium text-gray-900">
+                              {(appointment as any).meetingLink ? 'Link Available' : 'Pending'}
+                            </div>
+                            {(appointment as any).meetingId && (
+                              <div className="text-xs text-gray-500">
+                                ID: {(appointment as any).meetingId}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -259,15 +322,55 @@ export default function PatientAppointments() {
 
                     <div className="mt-4 space-y-2">
                       {appointment.status === 'confirmed' && (
-                        <button className="block w-full px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors">
-                          Join Meeting
-                        </button>
+                        <>
+                          {(appointment as any).meetingLink ? (
+                            <a
+                              href={(appointment as any).meetingLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block w-full px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors text-center"
+                            >
+                              Join Meeting
+                            </a>
+                          ) : (
+                            <button
+                              disabled
+                              className="block w-full px-4 py-2 bg-gray-300 text-gray-500 rounded-lg text-sm font-medium cursor-not-allowed"
+                            >
+                              Waiting for Meeting Link
+                            </button>
+                          )}
+                        </>
                       )}
 
                       {appointment.status === 'completed' && (
-                        <button className="block w-full px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
-                          Leave Review
-                        </button>
+                        <>
+                          {appointment.hasPrescription && (
+                            <button className="block w-full px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors">
+                              View Prescription
+                            </button>
+                          )}
+
+                          {appointment.hasReview ? (
+                            <button
+                              disabled
+                              className="block w-full px-4 py-2 bg-gray-300 text-gray-500 rounded-lg text-sm font-medium cursor-not-allowed"
+                            >
+                              Review Submitted
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleLeaveReview(
+                                appointment.id || '',
+                                appointment.doctorId,
+                                appointment.doctor?.fullName || 'Unknown Doctor'
+                              )}
+                              className="block w-full px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                            >
+                              Leave Review
+                            </button>
+                          )}
+                        </>
                       )}
 
                       {appointment.status === 'pending' && (
@@ -304,6 +407,16 @@ export default function PatientAppointments() {
           </div>
         )}
       </div>
+
+      {/* Review Modal */}
+      <ReviewModal
+        isOpen={reviewModal.isOpen}
+        onClose={() => setReviewModal({ ...reviewModal, isOpen: false })}
+        appointmentId={reviewModal.appointmentId}
+        doctorId={reviewModal.doctorId}
+        doctorName={reviewModal.doctorName}
+        onSuccess={handleReviewSuccess}
+      />
     </div>
   );
 }

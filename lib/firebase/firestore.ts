@@ -380,3 +380,187 @@ export const getTaskById = async (taskId: string) => {
     throw new Error(`Failed to fetch task: ${error.message}`);
   }
 };
+
+// ============ ATTENDANCE TRACKING ============
+export const updateAttendanceTracking = async (
+  appointmentId: string,
+  attendanceData: any
+) => {
+  try {
+    await updateDoc(doc(db, 'appointments', appointmentId), {
+      attendanceTracking: attendanceData,
+      updatedAt: serverTimestamp(),
+    });
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(`Failed to update attendance: ${error.message}`);
+  }
+};
+
+export const markParticipantJoined = async (
+  appointmentId: string,
+  participantType: 'doctor' | 'patient'
+) => {
+  try {
+    const appointmentDoc = await getDoc(doc(db, 'appointments', appointmentId));
+    if (!appointmentDoc.exists()) {
+      throw new Error('Appointment not found');
+    }
+
+    const appointment = appointmentDoc.data();
+    const currentTracking = appointment.attendanceTracking || {
+      doctorJoined: false,
+      patientJoined: false,
+      bothParticipantsPresent: false
+    };
+
+    const updates: any = {
+      [`attendanceTracking.${participantType}Joined`]: true,
+      [`attendanceTracking.${participantType}JoinTime`]: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    // Check if both participants are now present
+    const bothPresent = participantType === 'doctor' 
+      ? currentTracking.patientJoined 
+      : currentTracking.doctorJoined;
+
+    if (bothPresent) {
+      updates['attendanceTracking.bothParticipantsPresent'] = true;
+      updates['attendanceTracking.meetingStartTime'] = serverTimestamp();
+    }
+
+    await updateDoc(doc(db, 'appointments', appointmentId), updates);
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(`Failed to mark participant joined: ${error.message}`);
+  }
+};
+
+export const completeMeeting = async (appointmentId: string) => {
+  try {
+    await updateDoc(doc(db, 'appointments', appointmentId), {
+      'attendanceTracking.meetingEndTime': serverTimestamp(),
+      status: 'completed',
+      updatedAt: serverTimestamp(),
+    });
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(`Failed to complete meeting: ${error.message}`);
+  }
+};
+
+// ============ PRESCRIPTIONS ============
+export const createPrescription = async (prescriptionData: any) => {
+  try {
+    const docRef = await addDoc(collection(db, 'prescriptions'), {
+      ...prescriptionData,
+      createdAt: serverTimestamp(),
+    });
+    return { success: true, prescriptionId: docRef.id };
+  } catch (error: any) {
+    throw new Error(`Failed to create prescription: ${error.message}`);
+  }
+};
+
+export const getPrescriptionsByPatient = async (patientId: string) => {
+  try {
+    const q = query(
+      collection(db, 'prescriptions'),
+      where('patientId', '==', patientId),
+      orderBy('createdAt', 'desc')
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as any[];
+  } catch (error: any) {
+    throw new Error(`Failed to fetch prescriptions: ${error.message}`);
+  }
+};
+
+export const getPrescriptionsByAppointment = async (appointmentId: string) => {
+  try {
+    const q = query(
+      collection(db, 'prescriptions'),
+      where('appointmentId', '==', appointmentId)
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as any[];
+  } catch (error: any) {
+    throw new Error(`Failed to fetch appointment prescriptions: ${error.message}`);
+  }
+};
+
+// ============ REVIEWS ============
+export const getReviewsByAppointment = async (appointmentId: string) => {
+  try {
+    const q = query(
+      collection(db, 'reviews'),
+      where('appointmentId', '==', appointmentId)
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as any[];
+  } catch (error: any) {
+    throw new Error(`Failed to fetch appointment reviews: ${error.message}`);
+  }
+};
+
+// ============ ADMIN OPERATIONS ============
+export const getAllAppointments = async () => {
+  try {
+    const q = query(
+      collection(db, 'appointments'),
+      orderBy('scheduledDate', 'desc')
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as any[];
+  } catch (error: any) {
+    throw new Error(`Failed to fetch all appointments: ${error.message}`);
+  }
+};
+
+export const updateAppointmentMeetingLink = async (
+  appointmentId: string,
+  meetingLink: string,
+  meetingId?: string
+) => {
+  try {
+    await updateDoc(doc(db, 'appointments', appointmentId), {
+      meetingLink,
+      meetingId: meetingId || `meeting-${Date.now()}`,
+      status: 'confirmed',
+      updatedAt: serverTimestamp(),
+    });
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(`Failed to update meeting link: ${error.message}`);
+  }
+};
+
+export const getConfirmedAppointments = async () => {
+  try {
+    const q = query(
+      collection(db, 'appointments'),
+      where('status', '==', 'confirmed'),
+      orderBy('scheduledDate', 'asc')
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as any[];
+  } catch (error: any) {
+    throw new Error(`Failed to fetch confirmed appointments: ${error.message}`);
+  }
+};

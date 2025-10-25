@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useAccount, useChainId, useReadContract } from 'wagmi';
 import { useApproveDoctor, useDenyDoctor, useContractAddress } from '@/lib/contracts/hooks';
 import { DoctorRegistry } from '@/lib/constants';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 interface DoctorData {
   registrationId: number;
@@ -23,7 +24,7 @@ export default function AdminDoctors() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const doctorRegistryAddress = useContractAddress('DoctorRegistry');
-  
+
   const { approveDoctor, isPending: isApproving } = useApproveDoctor();
   const { denyDoctor, isPending: isDenying } = useDenyDoctor();
 
@@ -62,7 +63,7 @@ export default function AdminDoctors() {
     try {
       setLoading(true);
       setError('');
-      
+
       addDebug(`📊 Total registrations: ${numTotalRegistrations}`);
 
       if (numTotalRegistrations === 0) {
@@ -80,7 +81,7 @@ export default function AdminDoctors() {
       for (let i = 1; i <= numTotalRegistrations; i++) {
         try {
           addDebug(`Fetching registration #${i}...`);
-          
+
           // Use readContract from wagmi directly with the hook pattern
           const response = await fetch('/api/get-doctor-registration', {
             method: 'POST',
@@ -95,7 +96,7 @@ export default function AdminDoctors() {
             // Fallback to direct contract read if API doesn't exist
             const { readContract } = await import('@wagmi/core');
             const { config } = await import('@/lib/wagmi');
-            
+
             const result: any = await readContract(config, {
               abi: DoctorRegistry,
               address: doctorRegistryAddress as `0x${string}`,
@@ -134,7 +135,7 @@ export default function AdminDoctors() {
 
       addDebug(`✓ Successfully loaded ${doctorsData.length}/${numTotalRegistrations} doctors`);
       setDoctors(doctorsData);
-      
+
     } catch (error: any) {
       console.error('Error fetching doctors:', error);
       addDebug(`❌ FATAL ERROR: ${error.message}`);
@@ -148,18 +149,18 @@ export default function AdminDoctors() {
     try {
       setUpdatingDoctor(doctorAddress);
       addDebug(`🔄 Approving doctor: ${doctorAddress}`);
-      
+
       const tx = await approveDoctor(doctorAddress as `0x${string}`);
-      
+
       addDebug(`✓ Approve transaction sent: ${tx}`);
       alert('Doctor approved successfully! Transaction: ' + tx);
-      
+
       // Refresh the list
       setTimeout(() => {
         refetchTotal();
         fetchAllDoctors();
       }, 3000);
-      
+
     } catch (error: any) {
       addDebug(`❌ Failed to approve: ${error.shortMessage || error.message}`);
       alert(`Failed to approve doctor: ${error.shortMessage || error.message}`);
@@ -172,18 +173,18 @@ export default function AdminDoctors() {
     try {
       setUpdatingDoctor(doctorAddress);
       addDebug(`🔄 Denying doctor: ${doctorAddress}`);
-      
+
       const tx = await denyDoctor(doctorAddress as `0x${string}`);
-      
+
       addDebug(`✓ Deny transaction sent: ${tx}`);
       alert('Doctor denied successfully! Transaction: ' + tx);
-      
+
       // Refresh the list
       setTimeout(() => {
         refetchTotal();
         fetchAllDoctors();
       }, 3000);
-      
+
     } catch (error: any) {
       addDebug(`❌ Failed to deny: ${error.shortMessage || error.message}`);
       alert(`Failed to deny doctor: ${error.shortMessage || error.message}`);
@@ -224,6 +225,7 @@ export default function AdminDoctors() {
               </svg>
             </div>
             <h2 className="text-xl font-semibold text-primary mb-2">Wallet Not Connected</h2>
+            <ConnectButton />
             <p className="text-secondary">Please connect your wallet to access the admin panel.</p>
           </div>
         </div>
@@ -352,11 +354,10 @@ export default function AdminDoctors() {
                 <button
                   key={filterOption.key}
                   onClick={() => setFilter(filterOption.key as any)}
-                  className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all ${
-                    filter === filterOption.key
-                      ? 'bg-blue-600 text-white shadow-lg scale-105'
-                      : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                  }`}
+                  className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all ${filter === filterOption.key
+                    ? 'bg-blue-600 text-white shadow-lg scale-105'
+                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                    }`}
                 >
                   {filterOption.label}
                 </button>
@@ -422,7 +423,7 @@ export default function AdminDoctors() {
 
                         <div>
                           <div className="text-xs text-secondary mb-1">License Document</div>
-                          <a 
+                          <a
                             href={`https://gateway.pinata.cloud/ipfs/${doctor.legalDocumentsIPFSHash}`}
                             target="_blank"
                             rel="noopener noreferrer"

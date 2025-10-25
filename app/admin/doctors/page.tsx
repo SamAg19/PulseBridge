@@ -420,13 +420,20 @@ export default function AdminDoctors() {
                         <div>
                           <div className="text-xs text-secondary mb-1">License Document</div>
                           <a
-                            href={getIPFSHash(doctor.legalDocumentsIPFSHash)}
-                            target="_blank"
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              void (async () => {
+                                const url = await getIPFSLink(doctor.legalDocumentsIPFSHash);
+                                window.open(url, '_blank');
+                              })();
+                            }}
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:text-blue-800 text-xs underline font-medium"
                           >
                             View IPFS
                           </a>
+
                         </div>
                       </div>
 
@@ -487,7 +494,7 @@ export default function AdminDoctors() {
           </div>
         )}
       </div>
-    </div>
+    </div >
   );
 }
 

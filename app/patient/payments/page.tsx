@@ -9,8 +9,10 @@ import TokenSelector, { PaymentSecurityInfo } from '@/components/TokenSelector';
 import { useCreateSession, useApproveERC20, useERC20Allowance } from '@/lib/contracts/hooks';
 import { chains } from '@/lib/constants';
 import { Calendar, Clock, User, DollarSign, ArrowLeft } from 'lucide-react';
+import NexusBridgePayment from '@/components/payment/NexusBridgePayment';
 
 type TokenType = 'PYUSD' | 'ETH' | 'USDC' | 'USDT';
+type PaymentMethod = 'standard' | 'nexus';
 
 export default function PatientPayments() {
   const router = useRouter();
@@ -37,6 +39,7 @@ export default function PatientPayments() {
   const [tokenPrices, setTokenPrices] = useState<PriceData[]>([]);
   const [priceUpdates, setPriceUpdates] = useState<any>(null);
   const [convertedAmount, setConvertedAmount] = useState<number>(0);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('standard');
 
 
   // Get token address based on selected token
@@ -315,6 +318,81 @@ export default function PatientPayments() {
             {/* Security Info */}
             <PaymentSecurityInfo />
 
+            {/* Payment Method Selection */}
+            <div className="glass-card rounded-2xl p-6 border border-blue-200">
+              <h2 className="text-xl font-semibold text-primary mb-4">Choose Payment Method</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                {/* Standard Payment Option */}
+                <div
+                  onClick={() => setPaymentMethod('standard')}
+                  className={`cursor-pointer rounded-xl p-4 border-2 transition-all ${
+                    paymentMethod === 'standard'
+                      ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center">
+                      <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mr-3">
+                        <span className="text-white text-lg">💳</span>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900">Standard Payment</h3>
+                        <p className="text-sm text-gray-600">Direct blockchain payment</p>
+                      </div>
+                    </div>
+                    {paymentMethod === 'standard' && (
+                      <div className="flex items-center justify-center w-6 h-6 bg-blue-600 rounded-full">
+                        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                  <ul className="text-xs text-gray-600 space-y-1 ml-13">
+                    <li>• Pay with {selectedToken}</li>
+                    <li>• Approve + Create Session</li>
+                    <li>• Single chain transaction</li>
+                  </ul>
+                </div>
+
+                {/* Nexus Bridge Payment Option */}
+                <div
+                  onClick={() => setPaymentMethod('nexus')}
+                  className={`cursor-pointer rounded-xl p-4 border-2 transition-all ${
+                    paymentMethod === 'nexus'
+                      ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-200'
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center">
+                      <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full flex items-center justify-center mr-3">
+                        <span className="text-white text-lg">🌉</span>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900">Nexus Bridge</h3>
+                        <p className="text-sm text-gray-600">Cross-chain payment</p>
+                      </div>
+                    </div>
+                    {paymentMethod === 'nexus' && (
+                      <div className="flex items-center justify-center w-6 h-6 bg-purple-600 rounded-full">
+                        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                  <ul className="text-xs text-gray-600 space-y-1 ml-13">
+                    <li>• Bridge from any chain</li>
+                    <li>• One-click payment</li>
+                    <li>• Supports ETH, USDC, USDT</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
             {/* Payment Actions */}
             <div className="glass-card rounded-2xl p-6 border border-blue-200">
               <h2 className="text-xl font-semibold text-primary mb-4">Complete Payment</h2>
@@ -325,31 +403,55 @@ export default function PatientPayments() {
                 </div>
               )}
 
-              {step === 'approve' && selectedToken !== 'ETH' ? (
-                <div>
-                  <p className="text-secondary mb-4">
-                    First, approve {selectedToken} spending for the consultation escrow contract.
+              {paymentMethod === 'nexus' && selectedToken !== 'PYUSD' ? (
+                <NexusBridgePayment
+                  doctorId={bookingDetails.doctorId}
+                  consultationFee={convertedAmount > 0 ? convertedAmount : bookingDetails.fee}
+                  selectedToken={selectedToken as 'ETH' | 'USDC' | 'USDT'}
+                  startTime={Math.floor(new Date(`${bookingDetails.slotDate}T${bookingDetails.slotStartTime}`).getTime() / 1000)}
+                  onSuccess={() => {
+                    alert('Session created successfully! Redirecting to your appointments...');
+                    router.push('/patient/appointments');
+                  }}
+                  onError={(err) => {
+                    setError(`Nexus payment failed: ${err.message}`);
+                  }}
+                />
+              ) : paymentMethod === 'nexus' && selectedToken === 'PYUSD' ? (
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+                  <p className="text-sm text-yellow-800">
+                    ⚠️ Nexus Bridge payment is not available for PYUSD. Please select ETH or another stablecoin (USDC or USDT) or use Standard Payment method.
                   </p>
-                  <button
-                    onClick={handleApprove}
-                    disabled={processing || isApproving}
-                    className="w-full px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isApproving || processing ? (
-                      <div className="flex items-center justify-center">
-                        <svg className="animate-spin h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Approving...
-                      </div>
-                    ) : (
-                      `Approve ${convertedAmount > 0 ? (selectedToken === 'PYUSD' ? convertedAmount.toFixed(2) : convertedAmount.toFixed(6)) : bookingDetails.fee} ${selectedToken}`
-                    )}
-                  </button>
                 </div>
-              ) : (
-                <div>
+              ) : null}
+
+              {paymentMethod === 'standard' && (
+                <>
+                  {step === 'approve' && selectedToken !== 'ETH' ? (
+                    <div>
+                      <p className="text-secondary mb-4">
+                        First, approve {selectedToken} spending for the consultation escrow contract.
+                      </p>
+                      <button
+                        onClick={handleApprove}
+                        disabled={processing || isApproving}
+                        className="w-full px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isApproving || processing ? (
+                          <div className="flex items-center justify-center">
+                            <svg className="animate-spin h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Approving...
+                          </div>
+                        ) : (
+                          `Approve ${convertedAmount > 0 ? (selectedToken === 'PYUSD' ? convertedAmount.toFixed(2) : convertedAmount.toFixed(6)) : bookingDetails.fee} ${selectedToken}`
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
                   {selectedToken !== 'ETH' && (
                     <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl">
                       <p className="text-sm text-green-800">✓ {selectedToken} approved successfully</p>
@@ -388,10 +490,12 @@ export default function PatientPayments() {
                       </div>
                     )}
                   </button>
-                  <p className="text-sm text-gray-500 mt-3 text-center">
-                    By completing payment, you agree to our terms of service and privacy policy
-                  </p>
-                </div>
+                    <p className="text-sm text-gray-500 mt-3 text-center">
+                      By completing payment, you agree to our terms of service and privacy policy
+                    </p>
+                  </div>
+                )}
+                </>
               )}
             </div>
           </div>

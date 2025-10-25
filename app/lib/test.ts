@@ -20,7 +20,7 @@ let bridgeAndExecuteResult: BridgeAndExecuteResult;
 
     
 
-async function  bridgeandConsultSession(consultationFeePayment, doctorID ): Promise<string> {
+async function  bridgeandConsultSession(consultationFeePayment: unknown, doctorID: unknown ): Promise<string> {
     if (chainId == 11155111) {
     const USDC = chains[421614]["USDC"]
 

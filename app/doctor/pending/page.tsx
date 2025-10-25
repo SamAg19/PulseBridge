@@ -28,8 +28,6 @@ export default function DoctorPendingPage() {
             if (data.verificationStatus === 'approved') {
               router.push('/dashboard');
             }
-          } else {
-            router.push('/doctor/register');
           }
         } catch (error) {
           router.push('/doctor/register');
@@ -48,6 +46,7 @@ export default function DoctorPendingPage() {
       </div>
     );
   }
+
 
   return (
     <div className="min-h-screen medical-gradient flex items-center justify-center px-4 relative overflow-hidden">

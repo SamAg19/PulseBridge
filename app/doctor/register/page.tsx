@@ -86,49 +86,72 @@ export default function DoctorRegisterPage() {
         // Check if doctor is already registered
         const checkRegistration = async () => {
 
-            if (!address) {
+            if (address) {
                 try {
                     const email = await checkDoctorRegistration(String(address));
-                    const isDoc = await getDoctor();
+                    const isDocApproved = await isDoctorApproved();
 
-                    if (String(email) != "") {
-
-                        if (email || isDoc) {
-                            router.push('/dashboard');
-                        } else {
-                            router.push('/doctor/pending');
-                        }
-                        return;
+                    if (isDocApproved) {
+                        router.push('/dashboard');
                     }
+
+                    const isDocPending = await isDoctorPending();
+
+                    if (isDocPending) {
+                        router.push('/doctor/pending');
+                    }
+
+                    console.log('Doctor not registered, continuing with registration');
                 } catch (error) {
                     // Doctor not registered, continue with registration.
-                    console.log('Doctor not registered, continuing with registration');
+                    console.log('Error in fetching doctor registration:', error);
                 }
             }
+            await getFees();
             setCheckingRegistration(false);
-            await getFees()
         };
 
         checkRegistration();
     }, [address, isConnected, router]);
 
-
-    async function getDoctor(): Promise<String> {
+    async function isDoctorPending(): Promise<Boolean> {
 
         if (!address || !address.startsWith('0x') || address.length !== 42) {
             throw new Error('Invalid address format')
         }
 
-        const isDoctor: any = await readContract(config, {
+        const PendingDoctor: any = await readContract(config, {
             abi: DoctorRegistry,
             address: DocRegistry as `0x${string}`,
             functionName: 'getPendingDoctor',
             args: [address as `0x${string}`],
         })
 
+        return String(PendingDoctor["doctorAddress"]) == address;
 
+    }
 
-        return String(String(isDoctor[3]))
+    async function isDoctorApproved(): Promise<Boolean> {
+
+        if (!address || !address.startsWith('0x') || address.length !== 42) {
+            throw new Error('Invalid address format')
+        }
+
+        const doctorId: any = await readContract(config, {
+            abi: DoctorRegistry,
+            address: DocRegistry as `0x${string}`,
+            functionName: 'getDoctorID',
+            args: [address as `0x${string}`],
+        })
+
+        const Doctor: any = await readContract(config, {
+            abi: DoctorRegistry,
+            address: DocRegistry as `0x${string}`,
+            functionName: 'getDoctor',
+            args: [doctorId],
+        })
+
+        return String(Doctor["doctorAddress"]) == address;
     }
 
     async function getFees(): Promise<[number, number]> {

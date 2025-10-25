@@ -102,9 +102,12 @@ export default function HomePage() {
                     Receive crypto payments
                   </li>
                 </ul>
-                <button className="w-full btn-primary text-white font-semibold py-3 rounded-xl transition-all duration-300">
+                <Link
+                  href="/doctor/register"
+                  className="block w-full btn-primary text-white font-semibold py-3 rounded-xl transition-all duration-300"
+                >
                   Continue as Doctor
-                </button>
+                </Link>
               </div>
             </div>
 
@@ -160,33 +163,6 @@ export default function HomePage() {
             <div className="flex justify-center mb-4">
               <ConnectButton />
             </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (selectedRole === 'doctor') {
-    return (
-      <div className="min-h-screen medical-gradient flex items-center justify-center px-4">
-        <div className="max-w-md mx-auto text-center">
-          <div className="glass-card rounded-2xl p-8 shadow-2xl">
-            <h2 className="text-2xl font-bold text-primary mb-4">Doctor Registration</h2>
-            <p className="text-secondary mb-6">
-              Complete your profile to start providing medical services
-            </p>
-            <Link
-              href="/doctor/register"
-              className="block w-full btn-primary text-white font-semibold py-3 rounded-xl transition-all duration-300"
-            >
-              Complete Registration
-            </Link>
-            <button
-              onClick={() => setSelectedRole(null)}
-              className="mt-4 text-blue-600 hover:text-blue-800 transition-colors"
-            >
-              ← Back to role selection
-            </button>
           </div>
         </div>
       </div>

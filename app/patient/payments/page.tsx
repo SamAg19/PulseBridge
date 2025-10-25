@@ -150,11 +150,11 @@ export default function PatientPayments() {
         tokenAddress = chains[chainId]?.USDT as `0x${string}`;
       }
 
-      console.log(`0x${priceUpdates.binary.data}`);
+      console.log(`0x${priceUpdates.binary.data[0]}`);
       const txHash = await createSession({
         doctorId: bookingDetails.doctorId,
         consultationPayment: convertedAmount, // Use converted amount in selected token
-        priceUpdateData: `0x${priceUpdates.binary.data}`,
+        priceUpdateData: `0x${priceUpdates.binary.data[0]}`,
         tokenAddress: tokenAddress,
         startTime: startTimeUnix,
       });
@@ -181,7 +181,7 @@ export default function PatientPayments() {
   // Handle price updates from Pyth
   const handlePricesUpdate = (prices: PriceData[], priceData: any) => {
     setTokenPrices(prices);
-    console.log('Received price updates:', prices);
+    console.log('Received price updates:', priceData);
     setPriceUpdates(priceData);
   };
 
@@ -198,7 +198,7 @@ export default function PatientPayments() {
           // Convert: PYUSD fee * PYUSD price / selected token price
           const amountInUSD = bookingDetails.fee * pyusdPrice;
           const amountInSelectedToken = amountInUSD / selectedTokenPrice;
-          setConvertedAmount(amountInSelectedToken);
+          setConvertedAmount(amountInSelectedToken * 2);
         }
       }
     }

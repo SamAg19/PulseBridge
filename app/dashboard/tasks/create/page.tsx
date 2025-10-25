@@ -2,21 +2,40 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAccount } from 'wagmi';
+import { useAccount, useChainId } from 'wagmi';
 import Link from 'next/link';
-import { createTask } from '@/lib/firebase/firestore';
 import { TimeSlot } from '@/lib/types';
+import { setDoctorAvailability, getDoctorAvailability } from '@/lib/firebase/availability';
+import { useGetDoctorID } from '@/lib/contracts/hooks';
 
 const durations = [15, 30, 45, 60, 90, 120];
 
 export default function CreateTaskPage() {
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
   const router = useRouter();
   const [duration, setDuration] = useState(30);
   const [slots, setSlots] = useState<TimeSlot[]>([]);
-  const [currentSlot, setCurrentSlot] = useState({ date: '', startTime: '' });
+  const [currentSlot, setCurrentSlot] = useState({ date: '', startTime: '', endTime: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  const { doctorId, isLoading: loadingDoctorId } = useGetDoctorID(address);
+
+  // Calculate preview of slots count
+  const calculatePreviewSlotsCount = () => {
+    if (!currentSlot.startTime || !currentSlot.endTime) return 0;
+
+    const startDateTime = new Date(`2000-01-01T${currentSlot.startTime}:00`);
+    const endDateTime = new Date(`2000-01-01T${currentSlot.endTime}:00`);
+
+    if (endDateTime <= startDateTime) return 0;
+
+    const totalMinutes = (endDateTime.getTime() - startDateTime.getTime()) / 60000;
+    return Math.floor(totalMinutes / duration);
+  };
+
+  const previewSlotsCount = calculatePreviewSlotsCount();
 
   useEffect(() => {
     if (!isConnected) {
@@ -28,21 +47,48 @@ export default function CreateTaskPage() {
     return null;
   }
 
-  const addSlot = () => {
-    if (currentSlot.date && currentSlot.startTime) {
-      // Auto-calculate end time based on duration
-      const startTime = new Date(`2000-01-01T${currentSlot.startTime}:00`);
-      const endTime = new Date(startTime.getTime() + duration * 60000);
-      const endTimeString = endTime.toTimeString().slice(0, 5);
-      
-      const newSlot = {
-        ...currentSlot,
-        endTime: endTimeString
-      };
-      
-      setSlots([...slots, newSlot]);
-      setCurrentSlot({ date: '', startTime: '' });
+  const generateTimeSlots = () => {
+    if (!currentSlot.date || !currentSlot.startTime || !currentSlot.endTime) {
+      return;
     }
+
+    // Parse start and end times
+    const startDateTime = new Date(`2000-01-01T${currentSlot.startTime}:00`);
+    const endDateTime = new Date(`2000-01-01T${currentSlot.endTime}:00`);
+
+    // Validate that end time is after start time
+    if (endDateTime <= startDateTime) {
+      setError('End time must be after start time');
+      return;
+    }
+
+    // Generate slots
+    const newSlots: TimeSlot[] = [];
+    let currentTime = new Date(startDateTime);
+
+    while (currentTime < endDateTime) {
+      const slotEndTime = new Date(currentTime.getTime() + duration * 60000);
+
+      // Only add slot if it doesn't exceed the end time
+      if (slotEndTime <= endDateTime) {
+        newSlots.push({
+          date: currentSlot.date,
+          startTime: currentTime.toTimeString().slice(0, 5),
+          endTime: slotEndTime.toTimeString().slice(0, 5)
+        });
+      }
+
+      currentTime = slotEndTime;
+    }
+
+    if (newSlots.length === 0) {
+      setError('Time range is too short for the selected duration');
+      return;
+    }
+
+    setSlots([...slots, ...newSlots]);
+    setCurrentSlot({ date: '', startTime: '', endTime: '' });
+    setError('');
   };
 
   const removeSlot = (index: number) => {
@@ -50,29 +96,27 @@ export default function CreateTaskPage() {
   };
 
   const handleSubmit = async () => {
-    if (!address || slots.length === 0) return;
+    if (!address || !doctorId || slots.length === 0) return;
 
     setSubmitting(true);
     setError('');
 
     try {
-      // Create individual consultation services for each time slot
-      for (const slot of slots) {
-        await createTask({
-          title: 'Medical Consultation',
-          description: 'Professional medical consultation and health assessment',
-          category: 'consultation',
-          duration: duration,
-          fee: 0, // No payment processing
-          doctorId: address,
-          dateTimeSlots: [slot], // Each slot becomes a separate service
-          currency: 'PYUSD',
-          status: 'draft',
-        });
-      }
-      router.push('/dashboard/tasks');
+      // Get existing availability
+      const existingAvailability = await getDoctorAvailability(address);
+
+      // Merge new slots with existing ones
+      const existingSlots = existingAvailability?.timeSlots || [];
+      const allSlots = [...existingSlots, ...slots];
+
+      // Save to Firebase availability collection
+      await setDoctorAvailability(doctorId, address, allSlots);
+
+      alert(`Successfully added ${slots.length} time slot${slots.length > 1 ? 's' : ''}!`);
+      router.push('/dashboard');
     } catch (err: any) {
       setError(err.message);
+      console.error('Error saving availability:', err);
     } finally {
       setSubmitting(false);
     }
@@ -90,7 +134,7 @@ export default function CreateTaskPage() {
             Back to Dashboard
           </Link>
           <div className="text-sm text-secondary">
-            Add Consultation Times
+            Publish Availability
           </div>
         </div>
       </nav>
@@ -104,8 +148,8 @@ export default function CreateTaskPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <h1 className="text-3xl font-bold text-primary mb-2">Add Consultation Times</h1>
-            <p className="text-secondary">Set your available consultation times. Each time slot will become a bookable consultation service.</p>
+            <h1 className="text-3xl font-bold text-primary mb-2">Publish Your Availability</h1>
+            <p className="text-secondary">Set your available time slots. Patients will be able to view and book these slots for consultations.</p>
           </div>
 
           {error && (
@@ -142,14 +186,17 @@ export default function CreateTaskPage() {
                   ))}
                 </div>
                 <p className="mt-2 text-sm text-secondary">
-                  Select the duration for each consultation. End times will be calculated automatically.
+                  Select the duration for each consultation slot. We'll automatically create multiple slots based on your time range.
                 </p>
               </div>
 
               {/* Time Slot Addition */}
               <div>
-                <h3 className="text-lg font-semibold text-primary mb-4">Add Available Consultation Times</h3>
-                <div className="grid md:grid-cols-2 gap-4 mb-4">
+                <h3 className="text-lg font-semibold text-primary mb-4">Generate Consultation Time Slots</h3>
+                <p className="text-sm text-secondary mb-4">
+                  Select a date and time range. We'll automatically create {duration}-minute time slots for you.
+                </p>
+                <div className="grid md:grid-cols-3 gap-4 mb-4">
                   <div>
                     <label className="block text-sm font-medium text-primary mb-2">Date</label>
                     <input
@@ -167,22 +214,45 @@ export default function CreateTaskPage() {
                       value={currentSlot.startTime}
                       onChange={(e) => setCurrentSlot({ ...currentSlot, startTime: e.target.value })}
                       className="w-full px-4 py-3 bg-white border border-blue-200 rounded-xl input-focus focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      step="900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-primary mb-2">End Time</label>
+                    <input
+                      type="time"
+                      value={currentSlot.endTime}
+                      onChange={(e) => setCurrentSlot({ ...currentSlot, endTime: e.target.value })}
+                      className="w-full px-4 py-3 bg-white border border-blue-200 rounded-xl input-focus focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      step="900"
                     />
                   </div>
                 </div>
 
+                {/* Preview of slots to be generated */}
+                {previewSlotsCount > 0 && (
+                  <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <p className="text-sm text-blue-800">
+                      <strong>{previewSlotsCount}</strong> time slot{previewSlotsCount > 1 ? 's' : ''} will be generated ({duration} minutes each)
+                    </p>
+                  </div>
+                )}
+
                 <button
                   type="button"
-                  onClick={addSlot}
-                  disabled={!currentSlot.date || !currentSlot.startTime}
-                  className="mb-6 px-6 py-3 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={generateTimeSlots}
+                  disabled={!currentSlot.date || !currentSlot.startTime || !currentSlot.endTime}
+                  className="mb-6 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                 >
-                  + Add Consultation Time
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Generate {previewSlotsCount > 0 ? previewSlotsCount : ''} Time Slot{previewSlotsCount !== 1 ? 's' : ''}
                 </button>
 
                 {slots.length > 0 && (
                   <div className="space-y-3">
-                    <h4 className="font-medium text-primary">Available Consultation Times ({slots.length})</h4>
+                    <h4 className="font-medium text-primary">Time Slots to Publish ({slots.length})</h4>
                     {slots.map((slot, index) => (
                       <div key={index} className="flex items-center justify-between p-4 bg-blue-50 rounded-xl border border-blue-200">
                         <div className="flex items-center space-x-4">
@@ -220,7 +290,7 @@ export default function CreateTaskPage() {
                     <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <p>No consultation times added yet. Add at least one to continue.</p>
+                    <p>No time slots generated yet. Select a date and time range to continue.</p>
                   </div>
                 )}
               </div>
@@ -230,9 +300,9 @@ export default function CreateTaskPage() {
                 <div className="bg-green-50 rounded-xl p-6 border border-green-200">
                   <h3 className="font-semibold text-green-800 mb-3">Summary</h3>
                   <p className="text-sm text-green-700">
-                    You're creating <strong>{slots.length}</strong> consultation service{slots.length > 1 ? 's' : ''}, 
-                    each lasting <strong>{duration} minutes</strong>. 
-                    Patients will be able to book these specific time slots for consultations.
+                    You're publishing <strong>{slots.length}</strong> time slot{slots.length > 1 ? 's' : ''},
+                    each lasting <strong>{duration} minutes</strong>.
+                    These slots will be visible to patients and they can book them for consultations.
                   </p>
                 </div>
               )}
@@ -240,7 +310,7 @@ export default function CreateTaskPage() {
               <div className="flex justify-end mt-8">
                 <button
                   onClick={handleSubmit}
-                  disabled={slots.length === 0 || submitting}
+                  disabled={slots.length === 0 || submitting || loadingDoctorId || !doctorId}
                   className="btn-primary text-white font-semibold py-3 px-8 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submitting ? (
@@ -249,10 +319,10 @@ export default function CreateTaskPage() {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      Creating Consultation Times...
+                      Saving Availability...
                     </div>
                   ) : (
-                    `Create ${slots.length} Consultation${slots.length > 1 ? 's' : ''}`
+                    `Publish ${slots.length} Time Slot${slots.length > 1 ? 's' : ''}`
                   )}
                 </button>
               </div>

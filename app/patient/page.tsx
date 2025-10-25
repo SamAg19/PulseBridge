@@ -3,19 +3,17 @@
 import { useState, useEffect } from 'react';
 import { useAccount, useReadContracts } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { checkPatientExists } from '@/lib/firebase/firestore';
-import { DoctorWithTasks } from '@/lib/types';
+import { DoctorWithTasks, TimeSlot } from '@/lib/types';
 import DoctorCard from '@/components/DoctorCard';
 import Pagination from '@/components/Pagination';
-import PatientRegistrationModal from '@/components/PatientRegistrationModal';
-import RegistrationPrompt from '@/components/RegistrationPrompt';
 import ResponsiveLayout from '@/components/ResponsiveLayout';
-import { Search, Filter, Users, Clock, Coins, Calendar, CreditCard } from 'lucide-react';
+import { Search, Filter, Users, Clock, Coins, Calendar, CreditCard, X } from 'lucide-react';
 import { useGetTotalDoctors, useContractAddress } from '@/lib/contracts/hooks';
 import { DoctorRegistry } from '@/lib/constants';
 import { getAllDoctors } from "@/lib/contracts/utils"
 import { formatUnits } from 'viem';
 import { useChainId } from 'wagmi'
+import { getDoctorAvailabilityById, getAvailableSlots } from '@/lib/firebase/availability';
 
 export default function PatientDashboard() {
   const { address, isConnected } = useAccount();
@@ -26,10 +24,12 @@ export default function PatientDashboard() {
   const [totalDoctors, setTotalDoctors] = useState(0);
   const [selectedSpecialization, setSelectedSpecialization] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isRegistered, setIsRegistered] = useState(false);
-  const [checkingRegistration, setCheckingRegistration] = useState(true);
-  const [showRegistrationModal, setShowRegistrationModal] = useState(false);
-  const [showRegistrationPrompt, setShowRegistrationPrompt] = useState(false);
+
+  // Time slots modal state
+  const [showTimeSlotsModal, setShowTimeSlotsModal] = useState(false);
+  const [selectedDoctor, setSelectedDoctor] = useState<any>(null);
+  const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
   const chainId = useChainId()
 
@@ -125,32 +125,6 @@ export default function PatientDashboard() {
     }
   }, [totalDoctors, currentPage]);
 
-  useEffect(() => {
-    if (isConnected && address) {
-      checkPatientRegistration();
-    }
-  }, [isConnected, address]);
-
-  const checkPatientRegistration = async () => {
-    if (!address) return;
-
-    try {
-      setCheckingRegistration(true);
-      const exists = await checkPatientExists(address);
-      setIsRegistered(exists);
-
-      if (!exists) {
-        setTimeout(() => {
-          setShowRegistrationPrompt(true);
-        }, 2000);
-      }
-    } catch (error) {
-      console.error('Error checking patient registration:', error);
-    } finally {
-      setCheckingRegistration(false);
-    }
-  };
-
   const fetchDoctors = async () => {
     try {
       setLoading(true);
@@ -199,15 +173,34 @@ export default function PatientDashboard() {
     }
   }, [selectedSpecialization, searchQuery]);
 
-  const handleRegistrationSuccess = () => {
-    setIsRegistered(true);
-    setShowRegistrationModal(false);
-    setShowRegistrationPrompt(false);
+  const handleBookNow = async (doctor: any) => {
+    setSelectedDoctor(doctor);
+    setShowTimeSlotsModal(true);
+    setLoadingSlots(true);
+
+    try {
+      // Fetch available time slots from Firebase
+      const availability = await getDoctorAvailabilityById(doctor.doctorId);
+
+      if (availability && availability.timeSlots) {
+        // Filter only available (non-booked) slots
+        const slots = availability.timeSlots.filter((slot: TimeSlot) => !slot.isBooked);
+        setAvailableSlots(slots);
+      } else {
+        setAvailableSlots([]);
+      }
+    } catch (error) {
+      console.error('Error fetching time slots:', error);
+      setAvailableSlots([]);
+    } finally {
+      setLoadingSlots(false);
+    }
   };
 
-  const handleShowRegistrationModal = () => {
-    setShowRegistrationPrompt(false);
-    setShowRegistrationModal(true);
+  const handleCloseModal = () => {
+    setShowTimeSlotsModal(false);
+    setSelectedDoctor(null);
+    setAvailableSlots([]);
   };
 
   if (!isConnected) {
@@ -222,22 +215,6 @@ export default function PatientDashboard() {
             <p className="text-secondary text-sm sm:text-base">Please connect your wallet to access the healthcare platform and book appointments with verified doctors.</p>
           </div>
           <ConnectButton />
-        </div>
-      </div>
-    );
-  }
-
-  if (checkingRegistration) {
-    return (
-      <div className="min-h-screen bg-light-blue flex items-center justify-center p-4">
-        <div className="glass-card rounded-2xl p-6 sm:p-8 text-center max-w-md w-full border border-blue-200">
-          <div className="mb-6">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-spin">
-              <Users className="w-8 h-8 text-blue-600" />
-            </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-primary mb-2">Checking Registration</h1>
-            <p className="text-secondary text-sm sm:text-base">Please wait while we verify your account...</p>
-          </div>
         </div>
       </div>
     );
@@ -381,7 +358,10 @@ export default function PatientDashboard() {
                 <p className="text-sm text-secondary mb-3">{doctor.profileDescription}</p>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-blue-600">{doctor.consultationFeePerHour} PYUSD/hr</span>
-                  <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm">
+                  <button
+                    onClick={() => handleBookNow(doctor)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                  >
                     Book Now
                   </button>
                 </div>
@@ -420,19 +400,89 @@ export default function PatientDashboard() {
         </div>
       )}
 
-      {/* Registration Prompt */}
-      <RegistrationPrompt
-        isVisible={showRegistrationPrompt && !isRegistered}
-        onClose={() => setShowRegistrationPrompt(false)}
-        onRegister={handleShowRegistrationModal}
-      />
+      {/* Time Slots Modal */}
+      {showTimeSlotsModal && selectedDoctor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="glass-card rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-blue-200">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-white border-b border-blue-200 p-6 rounded-t-2xl">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+                    <Users className="w-8 h-8 text-blue-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-primary">{selectedDoctor.name}</h2>
+                    <p className="text-secondary">{selectedDoctor.specialization}</p>
+                    <p className="text-sm text-blue-600 font-medium mt-1">
+                      {selectedDoctor.consultationFeePerHour} PYUSD/hr
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleCloseModal}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="w-6 h-6 text-gray-600" />
+                </button>
+              </div>
+            </div>
 
-      {/* Patient Registration Modal */}
-      <PatientRegistrationModal
-        isOpen={showRegistrationModal}
-        onClose={() => setShowRegistrationModal(false)}
-        onSuccess={handleRegistrationSuccess}
-      />
+            {/* Modal Body */}
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-primary mb-4">Available Time Slots</h3>
+
+              {loadingSlots ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                  <p className="text-secondary">Loading available time slots...</p>
+                </div>
+              ) : availableSlots.length > 0 ? (
+                <div className="space-y-3">
+                  {availableSlots.map((slot, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-4 bg-blue-50 rounded-xl border border-blue-200 hover:bg-blue-100 transition-colors"
+                    >
+                      <div className="flex items-center space-x-4">
+                        <Calendar className="w-5 h-5 text-blue-600" />
+                        <div>
+                          <p className="font-medium text-primary">
+                            {new Date(slot.date).toLocaleDateString('en-US', {
+                              weekday: 'long',
+                              month: 'long',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}
+                          </p>
+                          <p className="text-sm text-secondary">
+                            {slot.startTime} - {slot.endTime}
+                          </p>
+                        </div>
+                      </div>
+                      <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+                        Select
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Clock className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-primary mb-2">No Available Slots</h3>
+                  <p className="text-secondary">
+                    This doctor doesn't have any available time slots at the moment.
+                    <br />
+                    Please check back later or contact the doctor directly.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </ResponsiveLayout>
   );
 }

@@ -170,7 +170,6 @@ const fs = await import("fs");
 const deploymentInfo = {
   network: networkName,
   chainId: await publicClient.getChainId(),
-  timestamp: new Date().toISOString(),
   deployer: deployer.account.address,
   useMocks,
   infrastructure: {

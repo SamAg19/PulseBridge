@@ -9,12 +9,14 @@ export const chains
     USDC: "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
     USDT: "0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0",
   },
-  // Add other networks as needed
-  // 11155111: { // Sepolia
-  //   DoctorRegistry: "0x...",
-  //   ConsultationEscrow: "0x...",
-  //   PYUSD: "0x...",
-  // },
+  // Sepolia testnet
+  11155111: {
+    DoctorRegistry: "0x9af937f164cebf2cb4603105c76f2be304cb2f02",
+    ConsultationEscrow: "0xc48c2b841d78bb8ea0384ea25faf7e31da4704f5",
+    PYUSD: "0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9",
+    USDC: "0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8",
+    USDT: "0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0",
+  },
 };
 
 // Standard ERC20 ABI

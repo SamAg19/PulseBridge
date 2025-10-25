@@ -1,0 +1,21 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "deployer": "0xab3a8dc2bed2c7e11eed21722c4b8cebfd684345",
+  "useMocks": false,
+  "infrastructure": {
+    "pyusd": "0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9",
+    "usdc": "0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8",
+    "usdt": "0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0",
+    "pythOracle": "0xDd24F84d36BF92C65F92307595335bdFab5Bbd21"
+  },
+  "contracts": {
+    "pythPriceConsumer": "0x1009667323c36686a169c57259675d494f4661a8",
+    "doctorRegistry": "0x9af937f164cebf2cb4603105c76f2be304cb2f02",
+    "consultationEscrow": "0xc48c2b841d78bb8ea0384ea25faf7e31da4704f5"
+  },
+  "parameters": {
+    "doctorDepositFee": "1000000",
+    "doctorStakeAmount": "3000000"
+  }
+}

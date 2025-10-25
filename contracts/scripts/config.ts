@@ -35,9 +35,9 @@ export interface DeploymentParams {
 
 export const DEFAULT_DEPLOYMENT_PARAMS: DeploymentParams = {
   doctorRegistry: {
-    // 100 PYUSD deposit fee (6 decimals)
-    depositFee: 100_000_000n,
-    // 1000 PYUSD stake amount (6 decimals)
-    stakeAmount: 1_000_000_000n,
+    // 1 PYUSD deposit fee (6 decimals)
+    depositFee: 1_000_000n,
+    // 3 PYUSD stake amount (6 decimals)
+    stakeAmount: 3_000_000n,
   },
 };

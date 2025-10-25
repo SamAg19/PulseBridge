@@ -13,7 +13,7 @@ from typing import List, Optional, Dict
 
 class ChatMessage(Model):
     """
-    Incoming chat message from user via DeltaV/ASI:One
+    Incoming chat message from user via ASI:One
 
     Received by: CoordinatorAgent
     """
@@ -23,7 +23,7 @@ class ChatMessage(Model):
 
 class ChatResponse(Model):
     """
-    Outgoing chat response to user via DeltaV/ASI:One
+    Outgoing chat response to user via ASI:One
 
     Sent by: CoordinatorAgent
     Contains full diagnosis, doctor recommendations, and AI transparency info

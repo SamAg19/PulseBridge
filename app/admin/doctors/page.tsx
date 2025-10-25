@@ -169,6 +169,8 @@ export default function AdminDoctors() {
     }
   };
 
+
+
   const handleDenyDoctor = async (doctorAddress: string) => {
     try {
       setUpdatingDoctor(doctorAddress);
@@ -349,8 +351,8 @@ export default function AdminDoctors() {
                   key={filterOption.key}
                   onClick={() => setFilter(filterOption.key as any)}
                   className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all ${filter === filterOption.key
-                      ? 'bg-blue-600 text-white shadow-lg scale-105'
-                      : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                    ? 'bg-blue-600 text-white shadow-lg scale-105'
+                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                     }`}
                 >
                   {filterOption.label}
@@ -418,7 +420,7 @@ export default function AdminDoctors() {
                         <div>
                           <div className="text-xs text-secondary mb-1">License Document</div>
                           <a
-                            href={`https://gateway.pinata.cloud/ipfs/${doctor.legalDocumentsIPFSHash}`}
+                            href={getIPFSHash(doctor.legalDocumentsIPFSHash)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:text-blue-800 text-xs underline font-medium"
@@ -487,4 +489,12 @@ export default function AdminDoctors() {
       </div>
     </div>
   );
+}
+
+async function getIPFSLink(cide: string): Promise<string> {
+  const uploadRequest = await fetch(`/api/files?cid=${encodeURIComponent(cide)}`, {
+    method: "GET",
+  });
+  const returnValue = await uploadRequest.json();
+  return returnValue
 }

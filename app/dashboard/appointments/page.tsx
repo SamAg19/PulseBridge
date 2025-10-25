@@ -163,7 +163,7 @@ export default function DoctorAppointments() {
       });
 
       const returnValue = await uploadRequest.json();
-      const ipfsHash = returnValue[0];
+      const ipfsHash = returnValue[1];
 
       setPrescriptionIPFS({ ...prescriptionIPFS, [sessionId]: ipfsHash });
       setUploadingPrescription({ ...uploadingPrescription, [sessionId]: false });
@@ -198,12 +198,14 @@ export default function DoctorAppointments() {
 
       // Only clear form data after successful completion
       setShowPrescriptionForm({ ...showPrescriptionForm, [session.sessionId]: false });
-      setPrescriptionData({ ...prescriptionData, [session.sessionId]: {
-        patientIssues: '',
-        diagnosis: '',
-        treatment: '',
-        prescription: ''
-      }});
+      setPrescriptionData({
+        ...prescriptionData, [session.sessionId]: {
+          patientIssues: '',
+          diagnosis: '',
+          treatment: '',
+          prescription: ''
+        }
+      });
       setPrescriptionIPFS({ ...prescriptionIPFS, [session.sessionId]: '' });
 
       fetchSessions(); // Refresh sessions
@@ -323,11 +325,10 @@ export default function DoctorAppointments() {
             <button
               key={filterOption.key}
               onClick={() => setFilter(filterOption.key as any)}
-              className={`px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-colors ${
-                filter === filterOption.key
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-              }`}
+              className={`px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-colors ${filter === filterOption.key
+                ? 'bg-blue-600 text-white'
+                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                }`}
             >
               {filterOption.label}
             </button>
@@ -418,7 +419,7 @@ export default function DoctorAppointments() {
                         </div>
                         {session.prescriptionIPFSHash && (
                           <a
-                            href={`https://gateway.pinata.cloud/ipfs/${session.prescriptionIPFSHash}`}
+                            href={`${session.prescriptionIPFSHash}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-sm text-blue-600 hover:underline"
@@ -582,7 +583,7 @@ export default function DoctorAppointments() {
                                   IPFS Hash: <span className="font-mono bg-white px-2 py-1 rounded">{prescriptionIPFS[session.sessionId]}</span>
                                 </p>
                                 <a
-                                  href={`https://gateway.pinata.cloud/ipfs/${prescriptionIPFS[session.sessionId]}`}
+                                  href={`${prescriptionIPFS[session.sessionId]}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-xs text-blue-600 hover:text-blue-800 underline"
@@ -639,7 +640,8 @@ export default function DoctorAppointments() {
               : `No ${filter} sessions found.`}
           </p>
         </div>
-      )}
-    </ResponsiveLayout>
+      )
+      }
+    </ResponsiveLayout >
   );
 }

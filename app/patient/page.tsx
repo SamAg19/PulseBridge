@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAccount, useReadContracts } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { useRouter } from 'next/navigation';
 import { DoctorWithTasks, TimeSlot } from '@/lib/types';
 import DoctorCard from '@/components/DoctorCard';
 import Pagination from '@/components/Pagination';
@@ -17,6 +18,9 @@ import { getDoctorAvailabilityById, getAvailableSlots } from '@/lib/firebase/ava
 
 export default function PatientDashboard() {
   const { address, isConnected } = useAccount();
+  const router = useRouter();
+  const chainId = useChainId();
+
   const [doctors, setDoctors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -30,8 +34,6 @@ export default function PatientDashboard() {
   const [selectedDoctor, setSelectedDoctor] = useState<any>(null);
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
-
-  const chainId = useChainId()
 
   // Get total doctors from contract
   const { totalDoctors: contractTotalDoctors, isLoading: contractLoading } = useGetTotalDoctors();
@@ -201,6 +203,21 @@ export default function PatientDashboard() {
     setShowTimeSlotsModal(false);
     setSelectedDoctor(null);
     setAvailableSlots([]);
+  };
+
+  const handleSlotSelect = (slot: TimeSlot) => {
+    // Navigate to payment page with doctor and slot info
+    const queryParams = new URLSearchParams({
+      doctorId: selectedDoctor.doctorId.toString(),
+      doctorName: selectedDoctor.name,
+      specialization: selectedDoctor.specialization,
+      fee: selectedDoctor.consultationFeePerHour.toString(),
+      slotDate: slot.date,
+      slotStartTime: slot.startTime,
+      slotEndTime: slot.endTime,
+    });
+
+    router.push(`/patient/payments?${queryParams.toString()}`);
   };
 
   if (!isConnected) {
@@ -460,7 +477,10 @@ export default function PatientDashboard() {
                           </p>
                         </div>
                       </div>
-                      <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+                      <button
+                        onClick={() => handleSlotSelect(slot)}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                      >
                         Select
                       </button>
                     </div>

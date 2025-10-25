@@ -9,11 +9,12 @@ import { chains, ConsultationEscrow, erc20Abi } from "@/lib/constants"
 import { readContract } from "@wagmi/core"
 
 interface PaymentSectionProps {
-  task: Task;
-  appointmentId: string | null;
-  doctorId: number;
-  onPayment: () => void;
-  isProcessing: boolean;
+  consultationFee: number;
+  selectedToken: 'PYUSD' | 'ETH' | 'USDC' | 'USDT';
+  onTokenSelect: (token: 'PYUSD' | 'ETH' | 'USDC' | 'USDT') => void;
+  convertedAmount: number;
+  tokenPrices?: Array<{ symbol: string; price: number }>;
+  isPYUSD?: boolean;
 }
 
 export default function PaymentSection({ task, appointmentId, doctorId, onPayment, isProcessing }: PaymentSectionProps) {

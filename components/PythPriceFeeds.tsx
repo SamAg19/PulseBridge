@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { HermesClient } from '@pythnetwork/hermes-client';
 
-interface PriceData {
+export interface PriceData {
   symbol: string;
   price: number;
   change24h: number;
@@ -13,9 +13,10 @@ interface PriceData {
 
 interface PythPriceFeedsProps {
   className?: string;
+  onPricesUpdate?: (prices: PriceData[]) => void;
 }
 
-export default function PythPriceFeeds({ className = '' }: PythPriceFeedsProps) {
+export default function PythPriceFeeds({ className = '', onPricesUpdate }: PythPriceFeedsProps) {
   const [prices, setPrices] = useState<PriceData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -43,10 +44,10 @@ export default function PythPriceFeeds({ className = '' }: PythPriceFeedsProps) 
 
   useEffect(() => {
     fetchPrices();
-    
-    // Update prices every 30 seconds
-    const interval = setInterval(fetchPrices, 30000);
-    
+
+    // Update prices every 10 seconds
+    const interval = setInterval(fetchPrices, 10000);
+
     return () => clearInterval(interval);
   }, []);
 
@@ -85,6 +86,11 @@ export default function PythPriceFeeds({ className = '' }: PythPriceFeedsProps) 
 
         setPrices(priceData);
         setLastUpdate(new Date());
+
+        // Call onPricesUpdate callback if provided
+        if (onPricesUpdate) {
+          onPricesUpdate(priceData);
+        }
       }
     } catch (err: any) {
       console.error('Error fetching Pyth prices:', err);

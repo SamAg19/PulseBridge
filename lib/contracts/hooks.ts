@@ -466,6 +466,56 @@ export function usePYUSDAllowance(owner?: `0x${string}`, spender?: `0x${string}`
   return { allowance, isLoading, error, refetch };
 }
 
+/**
+ * Generic ERC20 approve hook - works with any token
+ */
+export function useApproveERC20() {
+  const { writeContractAsync, isPending, error } = useWriteContract();
+
+  const approve = async (params: {
+    tokenAddress: `0x${string}`;
+    spender: `0x${string}`;
+    amount: number;
+    decimals?: number; // Default to 6 for stablecoins
+  }) => {
+    const decimals = params.decimals ?? 6;
+    const amountInWei = parseUnits(params.amount.toString(), decimals);
+
+    return await writeContractAsync({
+      address: params.tokenAddress,
+      abi: erc20Abi,
+      functionName: 'approve',
+      args: [params.spender, amountInWei],
+    });
+  };
+
+  return { approve, isPending, error };
+}
+
+/**
+ * Generic ERC20 allowance check - works with any token
+ */
+export function useERC20Allowance(
+  tokenAddress?: `0x${string}`,
+  owner?: `0x${string}`,
+  spender?: `0x${string}`,
+  decimals: number = 6
+) {
+  const { data, isLoading, error, refetch } = useReadContract({
+    address: tokenAddress,
+    abi: erc20Abi,
+    functionName: 'allowance',
+    args: owner && spender ? [owner, spender] : undefined,
+    query: {
+      enabled: !!tokenAddress && !!owner && !!spender,
+    },
+  });
+
+  const allowance = data ? Number(formatUnits(data, decimals)) : 0;
+
+  return { allowance, isLoading, error, refetch };
+}
+
 // ==================== CONTRACT EVENT HOOKS ====================
 
 /**

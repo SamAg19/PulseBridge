@@ -88,20 +88,23 @@ export default function DoctorRegisterPage() {
 
             if (address) {
                 try {
-                    const email = await checkDoctorRegistration(String(address));
-                    const isDocApproved = await isDoctorApproved();
-
-                    if (isDocApproved) {
-                        router.push('/dashboard');
+                    const registerId = await getDoctorRegistrationID();
+                    const status = await getDoctorRegistrationStatus(registerId);
+    
+                    if (registerId == 0) {
+                        console.log('Doctor not registered, continuing with registration');
                     }
-
-                    const isDocPending = await isDoctorPending();
-
-                    if (isDocPending) {
+                    else if (status == 0) {
                         router.push('/doctor/pending');
                     }
 
-                    console.log('Doctor not registered, continuing with registration');
+                    else if (status == 1) {
+                        router.push('/dashboard');
+                    }
+
+                    else if (status == 2) {
+                        router.push('/doctor/rejected');
+                    }
                 } catch (error) {
                     // Doctor not registered, continue with registration.
                     console.log('Error in fetching doctor registration:', error);
@@ -114,20 +117,34 @@ export default function DoctorRegisterPage() {
         checkRegistration();
     }, [address, isConnected, router]);
 
-    async function isDoctorPending(): Promise<Boolean> {
+    async function getDoctorRegistrationID(): Promise<number> {
 
         if (!address || !address.startsWith('0x') || address.length !== 42) {
             throw new Error('Invalid address format')
         }
-
-        const PendingDoctor: any = await readContract(config, {
+        const id: any = await readContract(config, {
             abi: DoctorRegistry,
             address: DocRegistry as `0x${string}`,
-            functionName: 'getPendingDoctor',
+            functionName: 'docToRegistrationID',
             args: [address as `0x${string}`],
         })
 
-        return String(PendingDoctor["doctorAddress"]) == address;
+        console.log("Doctor registration ID: ", id);
+        return id;
+    }
+
+    async function getDoctorRegistrationStatus(registerId: number): Promise<number> {
+
+        const status: any = await readContract(config, {
+            abi: DoctorRegistry,
+            address: DocRegistry as `0x${string}`,
+            functionName: 'isRegisterIDApproved',
+            args: [registerId],
+        })
+
+        console.log("Registration status: ", status);
+
+        return status;
 
     }
 

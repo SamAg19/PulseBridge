@@ -73,9 +73,10 @@ contract DoctorRegistryTest is Test {
             validDocIPFSHash
         );
 
-        assertEq(keccak256(abi.encode(ExpectedReturn)), keccak256(abi.encode(DocReg.getPendingDoctor(alice))));
+        (Structs.RegStruct memory PendingDoctor, uint8 status) = DocReg.getPendingDoctor(alice);
+        assertEq(keccak256(abi.encode(ExpectedReturn)), keccak256(abi.encode(PendingDoctor)));
         uint256 balanceAfter = PYUSD.balanceOf(alice);
-        assertEq(0, DocReg.isRegisterIDApproved(1));
+        assertEq(0, status);
 
         assertEq(balanceBefore - currentStakeAmount, balanceAfter);
         assertEq(PYUSD.balanceOf(address(DocReg)), currentStakeAmount);
@@ -149,10 +150,10 @@ contract DoctorRegistryTest is Test {
         );
 
         uint256 balanceAfter = PYUSD.balanceOf(alice);
-
+        (Structs.RegStruct memory PendingDoctor, uint8 status) = DocReg.getPendingDoctor(alice);
+        assertEq(keccak256(abi.encode(ExpectedReturn)), keccak256(abi.encode(PendingDoctor)));
         assertNotEq(keccak256(abi.encode(ExpectedReturn)), keccak256(abi.encode(DocReg.getDoctor(1))));
-        assertEq(keccak256(abi.encode(ExpectedReturn)), keccak256(abi.encode(DocReg.getPendingDoctor(alice))));
-        assertEq(2, DocReg.isRegisterIDApproved(1));
+        assertEq(2, status);
         assertEq(balanceBefore, balanceAfter);
         assertEq(PYUSD.balanceOf(address(DocReg)), stakeAmount);
     }

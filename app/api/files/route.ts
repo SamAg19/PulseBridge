@@ -25,3 +25,33 @@ returnv.push(cid, url)
 
 
 }
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const cid = searchParams.get('cid');
+    
+    if (!cid) {
+      return NextResponse.json(
+        { error: "CID parameter is required" },
+        { status: 400 }
+      );
+    }
+    
+    const url = await pinata.gateways.private.createAccessLink({
+      cid: cid,
+      expires: 172800,
+    });
+    
+    return NextResponse.json({ url }, { status: 200 });
+  } catch (e) {
+    console.log(e);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+
+
+
+}

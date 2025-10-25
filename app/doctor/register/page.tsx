@@ -258,6 +258,8 @@ export default function DoctorRegisterPage() {
         e.preventDefault();
         if (!address) return;
 
+
+
         // Validate IPFS hash is uploaded
         if (!formData.licenseNumber) {
             setError('Please upload your license document first');
@@ -473,7 +475,7 @@ export default function DoctorRegisterPage() {
                                                 <p className="text-sm font-semibold text-green-800 mb-1">Document uploaded successfully!</p>
                                                 <p className="text-xs text-green-700 mb-2">IPFS Hash: <span className="font-mono bg-white px-2 py-1 rounded">{formData.licenseNumber}</span></p>
                                                 <a
-                                                    href={`https://gateway.pinata.cloud/ipfs/${formData.licenseNumber}`}
+                                                    href={String(localStorage.getItem('IPFS'))}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="text-xs text-blue-600 hover:text-blue-800 underline"
@@ -561,7 +563,7 @@ export default function DoctorRegisterPage() {
                 <div className="text-center mt-6 animate-fadeInUp" style={{ animationDelay: '0.3s' }}>
                     <div className="glass-effect p-4 rounded-xl inline-block">
                         <p className="text-blue-600 text-sm font-medium">
-                            Your information will be reviewed for verification within 24-49 hours
+                            Your information will be reviewed for verification within 24-48 hours
                         </p>
                     </div>
                 </div>

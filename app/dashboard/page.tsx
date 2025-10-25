@@ -108,21 +108,9 @@ export default function DashboardPage() {
             <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-blue-200 transition-colors">
               <Plus className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
             </div>
-            <h3 className="text-lg sm:text-xl font-bold text-primary mb-2">Create New Service</h3>
-            <p className="text-secondary text-sm sm:text-base">Set up consultation, procedure, or follow-up services</p>
+            <h3 className="text-lg sm:text-xl font-bold text-primary mb-2">Add time slots</h3>
+            <p className="text-secondary text-sm sm:text-base">Add time slots for patients to schedule the session</p>
           </Link>
-
-          <Link
-            href="/dashboard/tasks"
-            className="glass-card rounded-xl hover:shadow-xl transition-all duration-300 p-6 sm:p-8 text-center transform hover:scale-105 border border-blue-200 group"
-          >
-            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-green-200 transition-colors">
-              <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
-            </div>
-            <h3 className="text-lg sm:text-xl font-bold text-primary mb-2">Manage Services</h3>
-            <p className="text-secondary text-sm sm:text-base">View and edit your existing services</p>
-          </Link>
-
           <Link
             href="/dashboard/appointments"
             className="glass-card rounded-xl hover:shadow-xl transition-all duration-300 p-6 sm:p-8 text-center transform hover:scale-105 border border-blue-200 group"

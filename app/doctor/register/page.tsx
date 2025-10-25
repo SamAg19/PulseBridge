@@ -2,15 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useReadContract, useChainId, useConfig, useAccount, useWriteContract } from 'wagmi'
+import { useChainId, useConfig, useAccount, useWriteContract } from 'wagmi'
 import Link from 'next/link';
-import { registerDoctorWithWallet, checkDoctorRegistration } from '@/lib/firebase/auth';
-import { DoctorProfile } from '@/lib/types';
-import { readContract, waitForTransactionReceipt, type WriteContractReturnType, getBalance } from "@wagmi/core"
-import { parseEther, formatEther, stringToHex, padHex, formatUnits } from 'viem'
-import { chains, DoctorRegistry, ConsultationEscrow, erc20Abi } from "@/lib/constants"
-import { writeContractSync } from 'viem/actions';
-import { StringDecoder } from 'node:string_decoder';
+import { readContract } from "@wagmi/core"
+import { formatUnits, parseUnits } from 'viem'
+import { chains, DoctorRegistry, erc20Abi } from "@/lib/constants"
 
 
 export default function DoctorRegisterPage() {
@@ -22,27 +18,23 @@ export default function DoctorRegisterPage() {
 
     // PINATA
     const [file, setFile] = useState<File>();
-    const [url, setUrl] = useState("");
     const [uploading, setUploading] = useState(false);
 
     const router = useRouter();
     const [formData, setFormData] = useState({
         fullName: '',
         specialization: '',
-        licenseNumber: '',
         email: '',
-        paymentwallet: '',
         consultationfee: '',
         profileDescription: '',
-
+        licenseNumber: '', // IPFS hash of uploaded document
     });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [fee, setFee] = useState("0");
-    const [stake, setStake] = useState("0")
+    const [stake, setStake] = useState("0");
     const [checkingRegistration, setCheckingRegistration] = useState(true);
-    const [doctorData, setDoctorData] = useState<(DoctorProfile & { id: string; walletAddress: string }) | null>(null);
-    const { data: hash, isPending, writeContractAsync } = useWriteContract()
+    const { writeContractAsync } = useWriteContract()
 
     const uploadFile = async () => {
         try {
@@ -59,12 +51,9 @@ export default function DoctorRegisterPage() {
                 body: data,
             });
             const cid = await uploadRequest.json();
-            setUrl(cid);
             setFormData({ ...formData, licenseNumber: cid });
             console.log("Uploaded file!: ", cid)
             setUploading(false);
-
-
         } catch (e) {
             console.log(e);
             setUploading(false);
@@ -171,84 +160,63 @@ export default function DoctorRegisterPage() {
         return String(Doctor["doctorAddress"]) == address;
     }
 
-    async function getFees(): Promise<[number, number]> {
-
-        const stakeAmount = await readContract(config, {
-
+    async function getFees(): Promise<[bigint, bigint]> {
+        const stakeAmountBigInt = await readContract(config, {
             abi: DoctorRegistry,
             address: DocRegistry as `0x${string}`,
             functionName: 'stakeAmount',
-        })
+        }) as bigint;
 
-        const depositFee = await readContract(config, {
-
+        const depositFeeBigInt = await readContract(config, {
             abi: DoctorRegistry,
             address: DocRegistry as `0x${string}`,
             functionName: 'depositFee',
-        })
-        console.log(depositFee, stakeAmount);
+        }) as bigint;
 
+        setFee(formatUnits(depositFeeBigInt, 6));
+        setStake(formatUnits(stakeAmountBigInt, 6));
 
-        setFee(formatUnits(depositFee as bigint, 6))
-        setStake(formatUnits(stakeAmount as bigint, 6))
-
-        return [Number(stakeAmount), Number(depositFee)];
-
-
+        return [stakeAmountBigInt, depositFeeBigInt];
     }
 
-    async function getApprovedPYUSD(): Promise<bigint> {
-
-        const response = await readContract(config, {
-
+    async function getApprovedPYUSD(): Promise<void> {
+        // Get current allowance
+        const currentAllowance = await readContract(config, {
             abi: erc20Abi,
             address: PYUSD as `0x${string}`,
-            functionName: `allowance`,
+            functionName: 'allowance',
             args: [address as `0x${string}`, DocRegistry as `0x${string}`]
-        })
+        }) as bigint;
 
-        const [stakeAmount, depositFee] = await getFees();
-        const stakeAmountBigInt = BigInt(stakeAmount);
-        const responseBigInt = response as bigint;
+        // Get required stake amount
+        const [stakeAmount] = await getFees();
 
-        if (stakeAmountBigInt > responseBigInt) {
-            if (responseBigInt === BigInt(0)) {
-                await writeContractAsync({
-                    abi: erc20Abi,
-                    address: PYUSD as `0x${string}`,
-                    functionName: "approve",
-                    args: [
-                        DocRegistry as `0x${string}`,
-                        stakeAmountBigInt,
-                    ],
-                })
+        // Only approve if current allowance is insufficient
+        if (currentAllowance < stakeAmount) {
+            // Note: Some tokens require resetting to 0 before changing approval
+            // PYUSD should not have this issue, but if you encounter problems,
+            // you may need to first approve(0) then approve(stakeAmount)
 
-            } else {
-                const unapprovedAmount = stakeAmountBigInt - responseBigInt;
-
-                await writeContractAsync({
-                    abi: erc20Abi,
-                    address: PYUSD as `0x${string}`,
-                    functionName: "approve",
-                    args: [
-                        DocRegistry as `0x${string}`,
-                        unapprovedAmount,
-                    ],
-                })
-
-            }
+            await writeContractAsync({
+                abi: erc20Abi,
+                address: PYUSD as `0x${string}`,
+                functionName: "approve",
+                args: [DocRegistry as `0x${string}`, stakeAmount],
+            });
         }
-        return responseBigInt;
     }
 
 
 
 
     async function registerAsDoctor() {
-
-
+        // 1. Approve PYUSD spending
         await getApprovedPYUSD();
 
+        // 2. Convert consultation fee to proper format (PYUSD has 6 decimals)
+        const feeInWei = parseUnits(formData.consultationfee, 6);
+
+        // 3. Register on-chain
         await writeContractAsync({
             abi: DoctorRegistry,
             address: DocRegistry as `0x${string}`,
@@ -258,28 +226,32 @@ export default function DoctorRegisterPage() {
                 formData.specialization,
                 formData.profileDescription,
                 formData.email,
-                BigInt(formData.consultationfee),
-                formData.licenseNumber, // fix this..
+                feeInWei,
+                formData.licenseNumber || '', // IPFS hash
             ],
-
-        })
-
-        // Depending on outcome show a popup or something..
-
+        });
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!address) return;
 
+        // Validate IPFS hash is uploaded
+        if (!formData.licenseNumber) {
+            setError('Please upload your license document first');
+            return;
+        }
+
         setError('');
         setLoading(true);
 
         try {
-            await registerAsDoctor(); // Remove the 'e' parameter from registerAsDoctor
+            await registerAsDoctor();
+            // Redirect to pending page after successful registration
             router.push('/doctor/pending');
         } catch (err: any) {
-            setError(err.message);
+            setError(err.message || 'Registration failed. Please try again.');
+            console.error('Registration error:', err);
         } finally {
             setLoading(false);
         }
@@ -400,23 +372,7 @@ export default function DoctorRegisterPage() {
                             </div>
                         </div>
 
-                        <div className="grid md:grid-cols-2 gap-6">
-                            <div>
-                                <label htmlFor="paymentwallet" className="block text-sm font-semibold text-primary mb-2">
-                                    Payment Wallet
-                                </label>
-                                <input
-                                    id="paymentwallet"
-                                    type="text"
-                                    value={formData.paymentwallet}
-                                    // onClick={(e) => setFormData({ ...formData, paymentwallet: address })}
-                                    onChange={(e) => setFormData({ ...formData, paymentwallet: e.target.value })}
-                                    className="w-full px-4 py-4 bg-white border border-blue-200 rounded-xl text-gray-900 placeholder-gray-500 input-focus focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    placeholder={`${address}`}
-                                    required
-                                />
-                            </div>
-
+                        <div className="grid md:grid-cols-1 gap-6">
                             <div>
                                 <label htmlFor="licenseNumber" className="block text-sm font-semibold text-primary mb-2">
                                     License Document
@@ -456,20 +412,20 @@ export default function DoctorRegisterPage() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-white rounded-lg p-4 shadow-sm">
                                     <p className="text-sm text-gray-600 mb-1">Deposit Fee</p>
-                                    <p className="text-2xl font-bold text-blue-600">${fee}</p>
-                                    <p className="text-xs text-gray-500 mt-1">One-time payment</p>
+                                    <p className="text-2xl font-bold text-blue-600">{fee} PYUSD</p>
+                                    <p className="text-xs text-gray-500 mt-1">Non-refundable</p>
                                 </div>
                                 <div className="bg-white rounded-lg p-4 shadow-sm">
                                     <p className="text-sm text-gray-600 mb-1">Stake Amount</p>
-                                    <p className="text-2xl font-bold text-blue-600">${stake}</p>
-                                    <p className="text-xs text-gray-500 mt-1">Refundable</p>
+                                    <p className="text-2xl font-bold text-blue-600">{stake} PYUSD</p>
+                                    <p className="text-xs text-gray-500 mt-1">Refunded on approval</p>
                                 </div>
                             </div>
                             <p className="text-xs text-gray-600 mt-4 flex items-start">
                                 <svg className="w-4 h-4 mr-1 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                                 </svg>
-                                <b>Total required: {stake} PYUSD. The stake amount will be returned when your account has been activated.</b>
+                                <b>Total required: {stake} PYUSD. You will get back {Number(stake) - Number(fee)} PYUSD when approved.</b>
                             </p>
                         </div>
                         <button

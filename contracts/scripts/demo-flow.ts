@@ -178,6 +178,12 @@ console.log(`  Transaction: ${registerTxHash}`);
 
 // Get doctor ID (should be 1 for first doctor)
 const doctorId = 1;
+const registerId = 1; // Since this is the first registration
+const pendingDoctor: any = await doctorRegistryContract.read.getPendingDoctorInfoByID([registerId]);
+console.log(pendingDoctor[0]["doctorAddress"]);
+
+
+console.log("-----------------------------------\n");
 console.log(`  Doctor ID: ${doctorId}\n`);
 
 // ============================================
@@ -198,7 +204,7 @@ console.log("✓ APPROVER role granted");
 // Approve the doctor
 console.log(`\nApproving Doctor ID: ${doctorId}...`);
 const approveTxHash = await doctorRegistryContract.write.approveDoctor(
-  [doctorId],
+  [pendingDoctor[0]["doctorAddress"]],
   { account: deployer.account }
 );
 await publicClient.waitForTransactionReceipt({ hash: approveTxHash });

@@ -402,7 +402,7 @@ export default function DoctorRegisterPage() {
 
 
                         </div>
-                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
+                        <div className="bg-linear-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
                             <h3 className="text-lg font-semibold text-primary mb-4 flex items-center">
                                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -422,7 +422,7 @@ export default function DoctorRegisterPage() {
                                 </div>
                             </div>
                             <p className="text-xs text-gray-600 mt-4 flex items-start">
-                                <svg className="w-4 h-4 mr-1 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <svg className="w-4 h-4 mr-1 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                                 </svg>
                                 <b>Total required: {stake} PYUSD. You will get back {Number(stake) - Number(fee)} PYUSD when approved.</b>
@@ -458,7 +458,7 @@ export default function DoctorRegisterPage() {
                 <div className="text-center mt-6 animate-fadeInUp" style={{ animationDelay: '0.3s' }}>
                     <div className="glass-effect p-4 rounded-xl inline-block">
                         <p className="text-blue-600 text-sm font-medium">
-                            🔒 Your information will be reviewed for verification within 24-49 hours
+                            Your information will be reviewed for verification within 24-49 hours
                         </p>
                     </div>
                 </div>

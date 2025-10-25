@@ -174,12 +174,6 @@ export default function AdminDashboard() {
               >
                 Doctor Verification
               </a>
-              <a
-                href="/admin/attendance"
-                className="px-4 py-2 text-secondary hover:text-primary transition font-medium"
-              >
-                Meeting Attendance
-              </a>
               <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
                 Admin Access
               </span>
@@ -354,7 +348,7 @@ export default function AdminDashboard() {
         )}
 
         {/* Quick Actions */}
-        <div className="mt-8">
+        <div className="mt-8 bg-center">
           <h2 className="text-xl font-bold text-primary mb-6">Quick Actions</h2>
           <div className="grid md:grid-cols-2 gap-6">
             <a
@@ -368,19 +362,6 @@ export default function AdminDashboard() {
               </div>
               <h3 className="text-xl font-bold text-primary mb-2">Doctor Verification</h3>
               <p className="text-secondary">Review and approve doctor registrations</p>
-            </a>
-
-            <a
-              href="/admin/attendance"
-              className="glass-card rounded-xl hover:shadow-xl transition-all duration-300 p-8 text-center transform hover:scale-105 border border-blue-200"
-            >
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-primary mb-2">Meeting Attendance</h3>
-              <p className="text-secondary">Track participant attendance in meetings</p>
             </a>
           </div>
         </div>

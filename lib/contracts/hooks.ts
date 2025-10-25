@@ -2,11 +2,6 @@ import { useReadContract, useWriteContract, useWatchContractEvent, useAccount, u
 import { chains, DoctorRegistry, ConsultationEscrow, erc20Abi } from '../constants';
 import { parseUnits, formatUnits } from 'viem';
 
-// ==================== HELPER FUNCTIONS ====================
-
-/**
- * Get contract address for current chain
- */
 export function useContractAddress(contractName: 'DoctorRegistry' | 'ConsultationEscrow' | 'PYUSD' | 'USDC' | 'USDT') {
   const chainId = useChainId();
   const address = chains[chainId]?.[contractName];
@@ -16,11 +11,6 @@ export function useContractAddress(contractName: 'DoctorRegistry' | 'Consultatio
   return address as `0x${string}` | undefined;
 }
 
-// ==================== DOCTOR REGISTRY HOOKS ====================
-
-/**
- * Register as a doctor on the blockchain
- */
 export function useRegisterDoctor() {
   const { writeContractAsync, isPending, error } = useWriteContract();
   const doctorRegistryAddress = useContractAddress('DoctorRegistry');

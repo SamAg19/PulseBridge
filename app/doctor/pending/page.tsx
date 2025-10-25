@@ -20,6 +20,8 @@ export default function DoctorPendingPage() {
   const [status, setStatus] = useState<'pending' | 'approved' | 'denied'>('pending');
   const [loading, setLoading] = useState(true);
 
+
+
   useEffect(() => {
     if (!isConnected) {
       router.push('/');
@@ -66,6 +68,7 @@ export default function DoctorPendingPage() {
       // If denied, could redirect to rejected page (or show message here)
       if (statusNumber === 2) {
         setStatus('denied');
+        localStorage.removeItem('IPFS');
       }
 
       // Get pending doctor details
@@ -114,17 +117,16 @@ export default function DoctorPendingPage() {
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-200 opacity-20 rounded-full animate-float"></div>
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-300 opacity-15 rounded-full animate-float" style={{animationDelay: '2s'}}></div>
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-300 opacity-15 rounded-full animate-float" style={{ animationDelay: '2s' }}></div>
       </div>
 
       <div className="relative z-10 max-w-2xl mx-auto text-center">
         <div className="glass-card rounded-2xl p-8 shadow-2xl animate-slideInRight">
           <div className="mb-8">
-            <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full mb-6 shadow-lg ${
-              status === 'pending' ? 'bg-yellow-100' :
+            <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full mb-6 shadow-lg ${status === 'pending' ? 'bg-yellow-100' :
               status === 'approved' ? 'bg-green-100' :
-              'bg-red-100'
-            }`}>
+                'bg-red-100'
+              }`}>
               {status === 'pending' && (
                 <svg className="w-10 h-10 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -170,11 +172,10 @@ export default function DoctorPendingPage() {
                   </span>
                 </p>
                 <p><span className="font-medium text-primary">Status:</span>
-                  <span className={`ml-2 px-3 py-1 rounded-full text-sm font-medium ${
-                    status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                  <span className={`ml-2 px-3 py-1 rounded-full text-sm font-medium ${status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                     status === 'approved' ? 'bg-green-100 text-green-800' :
-                    'bg-red-100 text-red-800'
-                  }`}>
+                      'bg-red-100 text-red-800'
+                    }`}>
                     {status.toUpperCase()}
                   </span>
                 </p>
@@ -182,7 +183,7 @@ export default function DoctorPendingPage() {
                   <p>
                     <span className="font-medium text-primary">Documents:</span>
                     <a
-                      href={`https://gateway.pinata.cloud/ipfs/${doctorData.legalDocumentsIPFSHash}`}
+                      href={String(localStorage.getItem('IPFS'))}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="ml-2 text-blue-600 hover:text-blue-800 underline text-sm"

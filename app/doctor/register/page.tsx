@@ -16,6 +16,8 @@ export default function DoctorRegisterPage() {
     const PYUSD = chains[chainId]["PYUSD"]
     const config = useConfig()
 
+
+
     // PINATA
     const [file, setFile] = useState<File>();
     const [uploading, setUploading] = useState(false);
@@ -50,10 +52,12 @@ export default function DoctorRegisterPage() {
                 method: "POST",
                 body: data,
             });
-            const cid = await uploadRequest.json();
-            setFormData({ ...formData, licenseNumber: cid });
-            console.log("Uploaded file!: ", cid)
+            const returnValue = await uploadRequest.json();
+            setFormData({ ...formData, licenseNumber: returnValue[0] });
+            console.log("Uploaded file!: ", returnValue[0])
             setUploading(false);
+            localStorage.setItem('IPFS', returnValue[1]);
+
         } catch (e) {
             console.log(e);
             setUploading(false);
@@ -79,7 +83,7 @@ export default function DoctorRegisterPage() {
                 try {
                     const registerId = await getDoctorRegistrationID();
                     const status = await getDoctorRegistrationStatus(registerId);
-    
+
                     if (registerId == 0) {
                         console.log('Doctor not registered, continuing with registration');
                     }
@@ -227,7 +231,7 @@ export default function DoctorRegisterPage() {
                 formData.profileDescription,
                 formData.email,
                 feeInWei,
-                formData.licenseNumber || '', // IPFS hash
+                formData.licenseNumber, // IPFS hash
             ],
         });
     }

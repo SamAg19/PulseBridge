@@ -177,14 +177,12 @@ console.log("✓ Doctor registered successfully");
 console.log(`  Transaction: ${registerTxHash}`);
 
 // Get doctor ID (should be 1 for first doctor)
-const doctorId = 1;
-const registerId = 1; // Since this is the first registration
+const registerId = await doctorRegistryContract.read.docToRegistrationID([doctor.account.address]);
 const pendingDoctor: any = await doctorRegistryContract.read.getPendingDoctorInfoByID([registerId]);
-console.log(pendingDoctor[0]["doctorAddress"]);
 
 
 console.log("-----------------------------------\n");
-console.log(`  Doctor ID: ${doctorId}\n`);
+console.log(` Registration ID: ${registerId}\n`);
 
 // ============================================
 // STEP 3: Admin Approves Doctor
@@ -202,7 +200,7 @@ await doctorRegistryContract.write.grantRole(
 console.log("✓ APPROVER role granted");
 
 // Approve the doctor
-console.log(`\nApproving Doctor ID: ${doctorId}...`);
+console.log(`\nApproving Registration ID: ${registerId}...`);
 const approveTxHash = await doctorRegistryContract.write.approveDoctor(
   [pendingDoctor[0]["doctorAddress"]],
   { account: deployer.account }
@@ -210,6 +208,8 @@ const approveTxHash = await doctorRegistryContract.write.approveDoctor(
 await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
 console.log("✓ Doctor approved successfully");
 console.log(`  Transaction: ${approveTxHash}`);
+
+const doctorId = await doctorRegistryContract.read.getDoctorID([pendingDoctor[0]["doctorAddress"]]);
 
 // Verify doctor is approved
 const approvedDoctor = await doctorRegistryContract.read.getDoctor([doctorId]);

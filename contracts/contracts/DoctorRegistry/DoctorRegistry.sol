@@ -41,6 +41,7 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
 
     constructor(address _owner, uint256 _depositFee, uint256 _stakeAmount, address _depositToken) {
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
+        _grantRole(APPROVER, _owner);
         stakeAmount = _stakeAmount;
         depositFee = _depositFee;
         depositToken = _depositToken;

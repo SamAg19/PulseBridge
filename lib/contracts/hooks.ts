@@ -224,8 +224,21 @@ export function useCreateSession() {
   }) => {
     if (!consultationEscrowAddress) throw new Error('ConsultationEscrow address not found');
 
-    // Convert payment to wei (assuming 6 decimals)
-    const paymentInWei = parseUnits(params.consultationPayment.toString(), 6);
+    // Determine decimals based on token type
+    // ETH uses 18 decimals, stablecoins use 6 decimals
+    const decimals = params.tokenAddress === '0x0000000000000000000000000000000000000000' ? 18 : 6;
+    const paymentInWei = parseUnits(params.consultationPayment.toString(), decimals);
+
+    console.log('Creating session with:', {
+      consultationPayment: params.consultationPayment,
+      decimals,
+      paymentInWei: paymentInWei.toString(),
+      paymentInETH: params.tokenAddress === '0x0000000000000000000000000000000000000000'
+        ? (Number(paymentInWei) / 1e18).toFixed(6) + ' ETH'
+        : (Number(paymentInWei) / 1e6).toFixed(6) + ' tokens',
+      tokenAddress: params.tokenAddress,
+      priceUpdateDataLength: params.priceUpdateData.length,
+    });
 
     return await writeContractAsync({
       address: consultationEscrowAddress,
@@ -240,6 +253,9 @@ export function useCreateSession() {
       ],
       // If paying with ETH, include value
       value: params.tokenAddress === '0x0000000000000000000000000000000000000000' ? paymentInWei : undefined,
+      // Set reasonable gas limit to avoid exceeding network cap
+      // Pyth oracle updates require more gas due to signature verification
+      gas: BigInt(5000000), // 5M gas should be sufficient
     });
   };
 

@@ -198,7 +198,7 @@ export default function PatientPayments() {
           // Convert: PYUSD fee * PYUSD price / selected token price
           const amountInUSD = bookingDetails.fee * pyusdPrice;
           const amountInSelectedToken = amountInUSD / selectedTokenPrice;
-          setConvertedAmount(amountInSelectedToken * 2);
+          setConvertedAmount(amountInSelectedToken + (0.01*amountInSelectedToken));
         }
       }
     }

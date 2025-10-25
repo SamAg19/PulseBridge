@@ -26,6 +26,16 @@ export default function DoctorAppointments() {
   const [filter, setFilter] = useState<'all' | 'pending' | 'confirmed' | 'completed'>('all');
   const [prescriptionIPFS, setPrescriptionIPFS] = useState<Record<number, string>>({});
 
+  // Prescription form states
+  const [showPrescriptionForm, setShowPrescriptionForm] = useState<Record<number, boolean>>({});
+  const [prescriptionData, setPrescriptionData] = useState<Record<number, {
+    patientIssues: string;
+    diagnosis: string;
+    treatment: string;
+    prescription: string;
+  }>>({});
+  const [uploadingPrescription, setUploadingPrescription] = useState<Record<number, boolean>>({});
+
   const { doctorId, isLoading: loadingDoctorId } = useGetDoctorID(address);
   const { releasePayment, isPending: isReleasingPayment } = useReleasePayment();
 
@@ -113,12 +123,69 @@ export default function DoctorAppointments() {
     });
   };
 
-  const handleCompletSession = async (session: SessionWithStatus) => {
-    const ipfsHash = prescriptionIPFS[session.sessionId];
+  const uploadPrescriptionToIPFS = async (sessionId: number) => {
+    const data = prescriptionData[sessionId];
 
-    if (!ipfsHash || ipfsHash.trim() === '') {
-      alert('Please enter a prescription IPFS hash');
-      return;
+    if (!data || !data.patientIssues || !data.diagnosis || !data.treatment || !data.prescription) {
+      alert('Please fill in all prescription fields');
+      return null;
+    }
+
+    try {
+      setUploadingPrescription({ ...uploadingPrescription, [sessionId]: true });
+
+      // Create JSON object with prescription data
+      const prescriptionJSON = {
+        sessionId,
+        patientIssues: data.patientIssues,
+        diagnosis: data.diagnosis,
+        treatment: data.treatment,
+        prescription: data.prescription,
+        timestamp: new Date().toISOString(),
+        doctorAddress: address
+      };
+
+      // Convert to blob
+      const blob = new Blob([JSON.stringify(prescriptionJSON, null, 2)], {
+        type: 'application/json'
+      });
+      const file = new File([blob], `prescription-${sessionId}.json`, {
+        type: 'application/json'
+      });
+
+      // Upload to IPFS via API
+      const formData = new FormData();
+      formData.set('file', file);
+
+      const uploadRequest = await fetch('/api/files', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const returnValue = await uploadRequest.json();
+      const ipfsHash = returnValue[0];
+
+      setPrescriptionIPFS({ ...prescriptionIPFS, [sessionId]: ipfsHash });
+      setUploadingPrescription({ ...uploadingPrescription, [sessionId]: false });
+
+      return ipfsHash;
+    } catch (error) {
+      console.error('Error uploading prescription:', error);
+      setUploadingPrescription({ ...uploadingPrescription, [sessionId]: false });
+      alert('Failed to upload prescription to IPFS');
+      return null;
+    }
+  };
+
+  const handleCompletSession = async (session: SessionWithStatus) => {
+    // First upload prescription to IPFS if not already uploaded
+    let ipfsHash = prescriptionIPFS[session.sessionId];
+
+    if (!ipfsHash) {
+      ipfsHash = await uploadPrescriptionToIPFS(session.sessionId);
+      if (!ipfsHash) {
+        return; // Upload failed
+      }
     }
 
     try {
@@ -128,10 +195,22 @@ export default function DoctorAppointments() {
       });
 
       alert('Session completed successfully! Payment released.');
+
+      // Only clear form data after successful completion
+      setShowPrescriptionForm({ ...showPrescriptionForm, [session.sessionId]: false });
+      setPrescriptionData({ ...prescriptionData, [session.sessionId]: {
+        patientIssues: '',
+        diagnosis: '',
+        treatment: '',
+        prescription: ''
+      }});
+      setPrescriptionIPFS({ ...prescriptionIPFS, [session.sessionId]: '' });
+
       fetchSessions(); // Refresh sessions
     } catch (error: any) {
       console.error('Error completing session:', error);
-      alert(`Failed to complete session: ${error.message}`);
+      alert(`Failed to complete blockchain transaction: ${error.message}. Your prescription is saved on IPFS. Click the button again to retry.`);
+      // Don't clear anything - keep form and IPFS hash so they can retry
     }
   };
 
@@ -354,24 +433,183 @@ export default function DoctorAppointments() {
                     {session.computedStatus === 'pending' && (
                       <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
                         <p className="text-sm text-yellow-800 mb-3">
-                          <strong>Action Required:</strong> Session time has passed. Upload prescription to complete and release payment.
+                          <strong>Action Required:</strong> Session time has passed. Fill prescription details to complete and release payment.
                         </p>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="Enter prescription IPFS hash"
-                            value={prescriptionIPFS[session.sessionId] || ''}
-                            onChange={(e) => setPrescriptionIPFS({ ...prescriptionIPFS, [session.sessionId]: e.target.value })}
-                            className="flex-1 px-3 py-2 border border-yellow-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                          />
+
+                        {/* Show button to open form if not shown yet */}
+                        {!showPrescriptionForm[session.sessionId] && !prescriptionIPFS[session.sessionId] && (
                           <button
-                            onClick={() => handleCompletSession(session)}
-                            disabled={isReleasingPayment}
-                            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={() => setShowPrescriptionForm({ ...showPrescriptionForm, [session.sessionId]: true })}
+                            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
                           >
-                            {isReleasingPayment ? 'Processing...' : 'Complete Session'}
+                            Fill Prescription Form
                           </button>
-                        </div>
+                        )}
+
+                        {/* Prescription Form */}
+                        {showPrescriptionForm[session.sessionId] && !prescriptionIPFS[session.sessionId] && (
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-sm font-semibold text-primary mb-1">
+                                Patient Issues
+                              </label>
+                              <textarea
+                                value={prescriptionData[session.sessionId]?.patientIssues || ''}
+                                onChange={(e) => setPrescriptionData({
+                                  ...prescriptionData,
+                                  [session.sessionId]: {
+                                    ...prescriptionData[session.sessionId],
+                                    patientIssues: e.target.value,
+                                    diagnosis: prescriptionData[session.sessionId]?.diagnosis || '',
+                                    treatment: prescriptionData[session.sessionId]?.treatment || '',
+                                    prescription: prescriptionData[session.sessionId]?.prescription || ''
+                                  }
+                                })}
+                                placeholder="Describe the patient's reported symptoms and concerns..."
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                                rows={2}
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-semibold text-primary mb-1">
+                                Diagnosis
+                              </label>
+                              <textarea
+                                value={prescriptionData[session.sessionId]?.diagnosis || ''}
+                                onChange={(e) => setPrescriptionData({
+                                  ...prescriptionData,
+                                  [session.sessionId]: {
+                                    ...prescriptionData[session.sessionId],
+                                    patientIssues: prescriptionData[session.sessionId]?.patientIssues || '',
+                                    diagnosis: e.target.value,
+                                    treatment: prescriptionData[session.sessionId]?.treatment || '',
+                                    prescription: prescriptionData[session.sessionId]?.prescription || ''
+                                  }
+                                })}
+                                placeholder="Your medical diagnosis based on examination..."
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                                rows={2}
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-semibold text-primary mb-1">
+                                Treatment Plan
+                              </label>
+                              <textarea
+                                value={prescriptionData[session.sessionId]?.treatment || ''}
+                                onChange={(e) => setPrescriptionData({
+                                  ...prescriptionData,
+                                  [session.sessionId]: {
+                                    ...prescriptionData[session.sessionId],
+                                    patientIssues: prescriptionData[session.sessionId]?.patientIssues || '',
+                                    diagnosis: prescriptionData[session.sessionId]?.diagnosis || '',
+                                    treatment: e.target.value,
+                                    prescription: prescriptionData[session.sessionId]?.prescription || ''
+                                  }
+                                })}
+                                placeholder="Recommended treatment approach and care instructions..."
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                                rows={2}
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-semibold text-primary mb-1">
+                                Medicinal Prescription
+                              </label>
+                              <textarea
+                                value={prescriptionData[session.sessionId]?.prescription || ''}
+                                onChange={(e) => setPrescriptionData({
+                                  ...prescriptionData,
+                                  [session.sessionId]: {
+                                    ...prescriptionData[session.sessionId],
+                                    patientIssues: prescriptionData[session.sessionId]?.patientIssues || '',
+                                    diagnosis: prescriptionData[session.sessionId]?.diagnosis || '',
+                                    treatment: prescriptionData[session.sessionId]?.treatment || '',
+                                    prescription: e.target.value
+                                  }
+                                })}
+                                placeholder="List of prescribed medications with dosage and instructions..."
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                                rows={3}
+                              />
+                            </div>
+
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setShowPrescriptionForm({ ...showPrescriptionForm, [session.sessionId]: false })}
+                                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-400 transition-colors"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={() => handleCompletSession(session)}
+                                disabled={isReleasingPayment || uploadingPrescription[session.sessionId]}
+                                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                              >
+                                {uploadingPrescription[session.sessionId] ? (
+                                  <>
+                                    <svg className="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Uploading to IPFS...
+                                  </>
+                                ) : isReleasingPayment ? (
+                                  'Processing Transaction...'
+                                ) : prescriptionIPFS[session.sessionId] ? (
+                                  'Complete Session & Release Payment'
+                                ) : (
+                                  'Upload & Complete Session'
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Show success message after upload */}
+                        {prescriptionIPFS[session.sessionId] && !showPrescriptionForm[session.sessionId] && (
+                          <div className="space-y-3">
+                            <div className="flex items-start p-3 bg-green-50 rounded-lg border border-green-200">
+                              <svg className="w-5 h-5 text-green-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <div className="flex-1">
+                                <p className="text-sm font-semibold text-green-800 mb-1">Prescription uploaded to IPFS!</p>
+                                <p className="text-xs text-green-700 mb-2">
+                                  IPFS Hash: <span className="font-mono bg-white px-2 py-1 rounded">{prescriptionIPFS[session.sessionId]}</span>
+                                </p>
+                                <a
+                                  href={`https://gateway.pinata.cloud/ipfs/${prescriptionIPFS[session.sessionId]}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-blue-600 hover:text-blue-800 underline"
+                                >
+                                  View prescription on IPFS →
+                                </a>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleCompletSession(session)}
+                              disabled={isReleasingPayment}
+                              className="w-full px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                            >
+                              {isReleasingPayment ? (
+                                <>
+                                  <svg className="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  Processing Transaction...
+                                </>
+                              ) : (
+                                'Complete Session & Release Payment'
+                              )}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
 

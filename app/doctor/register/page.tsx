@@ -381,10 +381,91 @@ export default function DoctorRegisterPage() {
                                 <label htmlFor="licenseNumber" className="block text-sm font-semibold text-primary mb-2">
                                     License Document
                                 </label>
-                                <input type="file" onChange={handleChange} required />
-                                <button type="button" className="w-full px-3 py-3 bg-white border border-blue-200 rounded-xl text-gray-900 placeholder-gray-500 input-focus focus:outline-none focus:ring-2 focus:ring-blue-500" disabled={uploading} onClick={uploadFile} >
-                                    {uploading ? "Uploading..." : "Upload"}
-                                </button>
+
+                                {/* File Upload Section */}
+                                <div className="space-y-3">
+                                    {/* File Input with Custom Styling */}
+                                    <div className="relative">
+                                        <input
+                                            type="file"
+                                            id="licenseFile"
+                                            onChange={handleChange}
+                                            required
+                                            accept=".pdf,.jpg,.jpeg,.png"
+                                            className="hidden"
+                                        />
+                                        <label
+                                            htmlFor="licenseFile"
+                                            className="flex items-center justify-center w-full px-4 py-4 bg-white border-2 border-dashed border-blue-300 rounded-xl cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all"
+                                        >
+                                            <svg className="w-6 h-6 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                            </svg>
+                                            <span className="text-gray-600 font-medium">
+                                                {file ? file.name : 'Choose license document'}
+                                            </span>
+                                        </label>
+                                    </div>
+
+                                    {/* Selected File Info */}
+                                    {file && !formData.licenseNumber && (
+                                        <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                            <div className="flex items-center space-x-2">
+                                                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                                <div>
+                                                    <p className="text-sm font-medium text-primary">{file.name}</p>
+                                                    <p className="text-xs text-secondary">{(file.size / 1024).toFixed(2)} KB</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={uploadFile}
+                                                disabled={uploading}
+                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                                            >
+                                                {uploading ? (
+                                                    <>
+                                                        <svg className="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
+                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                        </svg>
+                                                        Uploading...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                                                        </svg>
+                                                        Upload to IPFS
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Upload Success */}
+                                    {formData.licenseNumber && (
+                                        <div className="flex items-start p-4 bg-green-50 rounded-lg border border-green-200">
+                                            <svg className="w-6 h-6 text-green-600 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            <div className="flex-1">
+                                                <p className="text-sm font-semibold text-green-800 mb-1">Document uploaded successfully!</p>
+                                                <p className="text-xs text-green-700 mb-2">IPFS Hash: <span className="font-mono bg-white px-2 py-1 rounded">{formData.licenseNumber}</span></p>
+                                                <a
+                                                    href={`https://gateway.pinata.cloud/ipfs/${formData.licenseNumber}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-xs text-blue-600 hover:text-blue-800 underline"
+                                                >
+                                                    View on IPFS →
+                                                </a>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 

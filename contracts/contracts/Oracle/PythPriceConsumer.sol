@@ -12,7 +12,7 @@ contract PythPriceConsumer is IPythPriceConsumer {
     bytes32 public constant ETH_USD_PRICE_ID = 0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace;
     bytes32 public constant USDT_USD_PRICE_ID = 0x2b89b9dc8fdf9f34709a5b106b472f0f39bb6ca9ce04b0fd7f2e971688e2e53b;
     bytes32 public constant USDC_USD_PRICE_ID = 0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a;
-    bytes32 public constant PYUSD_USD_PRICE_ID = 0x3f9c88e4cc2f33c57c5d0897ea89c26d90ef4ff9cc442a20d1d71c0a7e7f9e46;
+    bytes32 public constant PYUSD_USD_PRICE_ID = 0xc1da1b73d7f01e7ddd54b3766cf7fcd644395ad14f70aa706ec5384c59e76692;
 
     // Maximum acceptable price age in seconds (fixed at 60 seconds)
     uint256 public constant MAX_PRICE_AGE = 60;

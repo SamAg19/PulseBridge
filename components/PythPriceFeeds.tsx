@@ -13,7 +13,7 @@ export interface PriceData {
 
 interface PythPriceFeedsProps {
   className?: string;
-  onPricesUpdate?: (prices: PriceData[]) => void;
+  onPricesUpdate?: (prices: PriceData[], priceData: any) => void;
 }
 
 export default function PythPriceFeeds({ className = '', onPricesUpdate }: PythPriceFeedsProps) {
@@ -89,7 +89,7 @@ export default function PythPriceFeeds({ className = '', onPricesUpdate }: PythP
 
         // Call onPricesUpdate callback if provided
         if (onPricesUpdate) {
-          onPricesUpdate(priceData);
+          onPricesUpdate(priceData, priceUpdates);
         }
       }
     } catch (err: any) {

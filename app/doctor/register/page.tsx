@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useChainId, useConfig, useAccount, useWriteContract } from 'wagmi'
 import Link from 'next/link';
-import { readContract } from "@wagmi/core"
+import { readContract, waitForTransactionReceipt } from "@wagmi/core"
 import { formatUnits, parseUnits } from 'viem'
 import { chains, DoctorRegistry, erc20Abi } from "@/lib/constants"
 
@@ -201,12 +201,21 @@ export default function DoctorRegisterPage() {
             // PYUSD should not have this issue, but if you encounter problems,
             // you may need to first approve(0) then approve(stakeAmount)
 
-            await writeContractAsync({
+            const txHash = await writeContractAsync({
                 abi: erc20Abi,
                 address: PYUSD as `0x${string}`,
                 functionName: "approve",
                 args: [DocRegistry as `0x${string}`, stakeAmount],
+                gas: BigInt(100000), // Set explicit gas limit for ERC20 approve
             });
+
+            // Wait for the approval transaction to be confirmed
+            console.log('Waiting for approval transaction confirmation...');
+            await waitForTransactionReceipt(config, {
+                hash: txHash,
+                confirmations: 1, // Wait for 1 confirmation
+            });
+            console.log('Approval transaction confirmed!');
         }
     }
 
@@ -221,7 +230,7 @@ export default function DoctorRegisterPage() {
         const feeInWei = parseUnits(formData.consultationfee, 6);
 
         // 3. Register on-chain
-        await writeContractAsync({
+        const txHash = await writeContractAsync({
             abi: DoctorRegistry,
             address: DocRegistry as `0x${string}`,
             functionName: "registerAsDoctor",
@@ -233,7 +242,16 @@ export default function DoctorRegisterPage() {
                 feeInWei,
                 formData.licenseNumber, // IPFS hash
             ],
+            gas: BigInt(1000000), // Set explicit gas limit for Sepolia
         });
+
+        // Wait for the registration transaction to be confirmed
+        console.log('Waiting for registration transaction confirmation...');
+        await waitForTransactionReceipt(config, {
+            hash: txHash,
+            confirmations: 1, // Wait for 1 confirmation
+        });
+        console.log('Registration transaction confirmed!');
     }
 
     const handleSubmit = async (e: React.FormEvent) => {

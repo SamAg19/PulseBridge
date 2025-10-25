@@ -177,6 +177,12 @@ export const DoctorRegistry = [
         {
           "indexed": false,
           "internalType": "uint32",
+          "name": "registrationId",
+          "type": "uint32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint32",
           "name": "docID",
           "type": "uint32"
         }
@@ -192,6 +198,12 @@ export const DoctorRegistry = [
           "internalType": "address",
           "name": "pendingDocAddr",
           "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint32",
+          "name": "registrationId",
+          "type": "uint32"
         }
       ],
       "name": "DoctorDenied",
@@ -205,6 +217,12 @@ export const DoctorRegistry = [
           "internalType": "address",
           "name": "docAddress",
           "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint32",
+          "name": "registrationId",
+          "type": "uint32"
         },
         {
           "indexed": false,
@@ -224,6 +242,12 @@ export const DoctorRegistry = [
           "internalType": "address",
           "name": "docAddress",
           "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint32",
+          "name": "numTotalRegistrations",
+          "type": "uint32"
         }
       ],
       "name": "PendingRegistration",
@@ -347,6 +371,25 @@ export const DoctorRegistry = [
       "inputs": [
         {
           "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "RegisteredDoctor",
+      "outputs": [
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
           "name": "_pendingDoctor",
           "type": "address"
         }
@@ -411,6 +454,25 @@ export const DoctorRegistry = [
     {
       "inputs": [
         {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "docToRegistrationID",
+      "outputs": [
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "uint32",
           "name": "_docID",
           "type": "uint32"
@@ -420,6 +482,16 @@ export const DoctorRegistry = [
       "outputs": [
         {
           "components": [
+            {
+              "internalType": "uint32",
+              "name": "registrationId",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "doctorId",
+              "type": "uint32"
+            },
             {
               "internalType": "string",
               "name": "Name",
@@ -500,6 +572,16 @@ export const DoctorRegistry = [
       "outputs": [
         {
           "components": [
+            {
+              "internalType": "uint32",
+              "name": "registrationId",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "doctorId",
+              "type": "uint32"
+            },
             {
               "internalType": "string",
               "name": "Name",
@@ -611,8 +693,40 @@ export const DoctorRegistry = [
       "type": "function"
     },
     {
+      "inputs": [
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "name": "isRegisterIDApproved",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [],
       "name": "numDoctors",
+      "outputs": [
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "numTotalRegistrations",
       "outputs": [
         {
           "internalType": "uint32",
@@ -749,7 +863,7 @@ export const DoctorRegistry = [
       "stateMutability": "nonpayable",
       "type": "function"
     }
-  ]as const;
+  ] as const;
 
 // ConsultationEscrow ABI (placeholder - add functions as needed)
 export const ConsultationEscrow = [

@@ -4,6 +4,8 @@ pragma solidity 0.8.30;
 
 library Structs {
     struct RegStruct {
+        uint32 registrationId;
+        uint32 doctorId;
         string Name;
         string specialization;
         string profileDescription;

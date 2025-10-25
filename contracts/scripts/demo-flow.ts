@@ -268,6 +268,7 @@ console.log(`  Payment Amount: ${formatUnits(consultationPayment, 6)} PYUSD`);
 
 // For PYUSD payment, we don't need Pyth price data
 const emptyPriceData: `0x${string}`[] = [];
+const startTime = Date.now() + 60000; // 1 minute from now
 
 const createSessionTxHash = await consultationEscrowContract.write.createSession(
   [
@@ -275,6 +276,7 @@ const createSessionTxHash = await consultationEscrowContract.write.createSession
     consultationPayment,
     emptyPriceData,
     pyusdContract.address,
+    BigInt(Math.floor(startTime / 1000)), // startTime in seconds
   ],
   {
     account: patient.account,

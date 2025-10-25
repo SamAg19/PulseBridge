@@ -626,6 +626,87 @@ export const DoctorRegistry = [
           "internalType": "struct Structs.RegStruct",
           "name": "DS",
           "type": "tuple"
+        },
+        {
+          "internalType": "uint8",
+          "name": "status",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint32",
+          "name": "_registrationId",
+          "type": "uint32"
+        }
+      ],
+      "name": "getPendingDoctorInfoByID",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint32",
+              "name": "registrationId",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "doctorId",
+              "type": "uint32"
+            },
+            {
+              "internalType": "string",
+              "name": "Name",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "specialization",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "profileDescription",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "email",
+              "type": "string"
+            },
+            {
+              "internalType": "address",
+              "name": "doctorAddress",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "consultationFeePerHour",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "depositFeeStored",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "legalDocumentsIPFSHash",
+              "type": "string"
+            }
+          ],
+          "internalType": "struct Structs.RegStruct",
+          "name": "DS",
+          "type": "tuple"
+        },
+        {
+          "internalType": "uint8",
+          "name": "status",
+          "type": "uint8"
         }
       ],
       "stateMutability": "view",
@@ -703,9 +784,9 @@ export const DoctorRegistry = [
       "name": "isRegisterIDApproved",
       "outputs": [
         {
-          "internalType": "bool",
+          "internalType": "uint8",
           "name": "",
-          "type": "bool"
+          "type": "uint8"
         }
       ],
       "stateMutability": "view",

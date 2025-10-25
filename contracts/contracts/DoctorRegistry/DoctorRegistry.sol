@@ -11,9 +11,9 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
     using SafeERC20 for IERC20;
 
     enum RegStatus {
-        PENDING,
-        APPROVED,
-        DENIED
+        PENDING, // 0
+        APPROVED, // 1
+        DENIED // 2
     }
 
     mapping(uint32 => Structs.RegStruct) ApprovedRegistry;
@@ -26,8 +26,10 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
     uint256 public depositFee;
     uint256 public stakeAmount;
     uint256 public totalPYUsdToBeCollected;
+
     uint32 public numTotalRegistrations;
     uint32 public numDoctors;
+
     bytes32 public constant APPROVER = keccak256("APPROVER");
     bytes32 public constant EMPTY_STRING_HASH = keccak256(abi.encodePacked(""));
 
@@ -93,7 +95,7 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
      * @param _pendingDoctor the doctor that gets approved.
      */
     function approveDoctor(address _pendingDoctor) public onlyRole(APPROVER) {
-        Structs.RegStruct memory Docreg = getPendingDoctor(_pendingDoctor);
+        (Structs.RegStruct memory Docreg, ) = getPendingDoctor(_pendingDoctor);
 
         numDoctors++;
 
@@ -111,9 +113,11 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
      * @param _pendingDoctor the doctor that gets approved.
      */
     function denyDoctor(address _pendingDoctor) public onlyRole(APPROVER) {
-        Structs.RegStruct memory Docreg = getPendingDoctor(_pendingDoctor);
+        (Structs.RegStruct memory Docreg, ) = getPendingDoctor(_pendingDoctor);
         totalPYUsdToBeCollected += stakeAmount - Docreg.depositFeeStored;
+
         isRegisterIDApproved[Docreg.registrationId] = uint8(RegStatus.DENIED);
+
         emit DoctorDenied(_pendingDoctor, Docreg.registrationId);
     }
 
@@ -155,8 +159,16 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
      * @notice returns an NON-APPROVED doctor
      * @param _pendingDoctor the specific NON-APPROVED doctor you want returned.
      */
-    function getPendingDoctor(address _pendingDoctor) public view returns (Structs.RegStruct memory DS) {
+    function getPendingDoctor(address _pendingDoctor) public view returns (Structs.RegStruct memory DS, uint8 status) {
         uint32 registerId = docToRegistrationID[_pendingDoctor];
-        return PendingRegistry[registerId];
+        return (PendingRegistry[registerId], isRegisterIDApproved[registerId]);
+    }
+
+    /**
+     * @notice returns an NON-APPROVED doctor by their registrationID
+     * @param _registrationId the specific NON-APPROVED doctor you want returned.
+     */
+    function getPendingDoctorInfoByID(uint32 _registrationId) public view returns (Structs.RegStruct memory DS, uint8 status) {
+        return (PendingRegistry[_registrationId], isRegisterIDApproved[_registrationId]);
     }
 }

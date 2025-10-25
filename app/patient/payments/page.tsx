@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useAccount, useChainId } from 'wagmi';
+import { useAccount, useChainId, useConfig } from 'wagmi';
+import { waitForTransactionReceipt } from '@wagmi/core';
 import PythPriceFeeds, { PriceData } from '@/components/PythPriceFeeds';
 import TokenSelector, { PaymentSecurityInfo } from '@/components/TokenSelector';
 import { useCreateSession, useApproveERC20, useERC20Allowance } from '@/lib/contracts/hooks';
@@ -16,6 +17,7 @@ export default function PatientPayments() {
   const searchParams = useSearchParams();
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
+  const config = useConfig();
 
   // Booking details from URL params
   const [bookingDetails, setBookingDetails] = useState({
@@ -33,7 +35,9 @@ export default function PatientPayments() {
   const [step, setStep] = useState<'approve' | 'create'>('approve');
   const [selectedToken, setSelectedToken] = useState<TokenType>('PYUSD');
   const [tokenPrices, setTokenPrices] = useState<PriceData[]>([]);
+  const [priceUpdates, setPriceUpdates] = useState<any>(null);
   const [convertedAmount, setConvertedAmount] = useState<number>(0);
+
 
   // Get token address based on selected token
   const getTokenAddress = (): `0x${string}` | undefined => {
@@ -99,12 +103,20 @@ export default function PatientPayments() {
 
       const escrowAddress = chains[chainId]?.ConsultationEscrow as `0x${string}`;
 
-      await approve({
+      const txHash = await approve({
         tokenAddress: tokenAddr,
         spender: escrowAddress,
         amount: convertedAmount, // Use converted amount in selected token
         decimals: getTokenDecimals(),
       });
+
+      // Wait for the approval transaction to be confirmed
+      console.log('Waiting for approval transaction confirmation...');
+      await waitForTransactionReceipt(config, {
+        hash: txHash,
+        confirmations: 1, // Wait for 1 confirmation
+      });
+      console.log('Approval transaction confirmed!');
 
       // Refetch allowance to check if approved
       await refetchAllowance();
@@ -138,12 +150,22 @@ export default function PatientPayments() {
         tokenAddress = chains[chainId]?.USDT as `0x${string}`;
       }
 
-      await createSession({
+      console.log(`0x${priceUpdates.binary.data}`);
+      const txHash = await createSession({
         doctorId: bookingDetails.doctorId,
         consultationPayment: convertedAmount, // Use converted amount in selected token
+        priceUpdateData: `0x${priceUpdates.binary.data}`,
         tokenAddress: tokenAddress,
         startTime: startTimeUnix,
       });
+
+      // Wait for the session creation transaction to be confirmed
+      console.log('Waiting for session creation transaction confirmation...');
+      await waitForTransactionReceipt(config, {
+        hash: txHash,
+        confirmations: 1, // Wait for 1 confirmation
+      });
+      console.log('Session creation transaction confirmed!');
 
       // Success - redirect to appointments
       alert('Session created successfully! Redirecting to your appointments...');
@@ -157,8 +179,10 @@ export default function PatientPayments() {
   };
 
   // Handle price updates from Pyth
-  const handlePricesUpdate = (prices: PriceData[]) => {
+  const handlePricesUpdate = (prices: PriceData[], priceData: any) => {
     setTokenPrices(prices);
+    console.log('Received price updates:', prices);
+    setPriceUpdates(priceData);
   };
 
   // Convert PYUSD fee to selected token

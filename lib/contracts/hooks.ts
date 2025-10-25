@@ -220,7 +220,7 @@ export function useCreateSession() {
     consultationPayment: number; // in token units
     tokenAddress: `0x${string}`; // PYUSD, USDC, USDT, or ETH
     startTime: number; // Unix timestamp
-    priceUpdateData?: `0x${string}`[]; // For Pyth oracle
+    priceUpdateData: `0x${string}`; // For Pyth oracle
   }) => {
     if (!consultationEscrowAddress) throw new Error('ConsultationEscrow address not found');
 
@@ -234,7 +234,7 @@ export function useCreateSession() {
       args: [
         params.doctorId,
         paymentInWei,
-        params.priceUpdateData || [],
+        [params.priceUpdateData],
         params.tokenAddress,
         BigInt(params.startTime),
       ],

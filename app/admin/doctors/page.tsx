@@ -23,7 +23,7 @@ export default function AdminDoctors() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const doctorRegistryAddress = useContractAddress('DoctorRegistry');
-  
+
   const { approveDoctor, isPending: isApproving } = useApproveDoctor();
   const { denyDoctor, isPending: isDenying } = useDenyDoctor();
 
@@ -62,7 +62,7 @@ export default function AdminDoctors() {
     try {
       setLoading(true);
       setError('');
-      
+
       addDebug(`📊 Total registrations: ${numTotalRegistrations}`);
 
       if (numTotalRegistrations === 0) {
@@ -80,7 +80,7 @@ export default function AdminDoctors() {
       for (let i = 1; i <= numTotalRegistrations; i++) {
         try {
           addDebug(`Fetching registration #${i}...`);
-          
+
           // Use readContract from wagmi directly with the hook pattern
           const response = await fetch('/api/get-doctor-registration', {
             method: 'POST',
@@ -95,7 +95,7 @@ export default function AdminDoctors() {
             // Fallback to direct contract read if API doesn't exist
             const { readContract } = await import('@wagmi/core');
             const { config } = await import('@/lib/wagmi');
-            
+
             const result: any = await readContract(config, {
               abi: DoctorRegistry,
               address: doctorRegistryAddress as `0x${string}`,
@@ -134,7 +134,7 @@ export default function AdminDoctors() {
 
       addDebug(`✓ Successfully loaded ${doctorsData.length}/${numTotalRegistrations} doctors`);
       setDoctors(doctorsData);
-      
+
     } catch (error: any) {
       console.error('Error fetching doctors:', error);
       addDebug(`❌ FATAL ERROR: ${error.message}`);
@@ -148,18 +148,18 @@ export default function AdminDoctors() {
     try {
       setUpdatingDoctor(doctorAddress);
       addDebug(`🔄 Approving doctor: ${doctorAddress}`);
-      
+
       const tx = await approveDoctor(doctorAddress as `0x${string}`);
-      
+
       addDebug(`✓ Approve transaction sent: ${tx}`);
       alert('Doctor approved successfully! Transaction: ' + tx);
-      
+
       // Refresh the list
       setTimeout(() => {
         refetchTotal();
         fetchAllDoctors();
       }, 3000);
-      
+
     } catch (error: any) {
       addDebug(`❌ Failed to approve: ${error.shortMessage || error.message}`);
       alert(`Failed to approve doctor: ${error.shortMessage || error.message}`);
@@ -172,18 +172,18 @@ export default function AdminDoctors() {
     try {
       setUpdatingDoctor(doctorAddress);
       addDebug(`🔄 Denying doctor: ${doctorAddress}`);
-      
+
       const tx = await denyDoctor(doctorAddress as `0x${string}`);
-      
+
       addDebug(`✓ Deny transaction sent: ${tx}`);
       alert('Doctor denied successfully! Transaction: ' + tx);
-      
+
       // Refresh the list
       setTimeout(() => {
         refetchTotal();
         fetchAllDoctors();
       }, 3000);
-      
+
     } catch (error: any) {
       addDebug(`❌ Failed to deny: ${error.shortMessage || error.message}`);
       alert(`Failed to deny doctor: ${error.shortMessage || error.message}`);
@@ -257,32 +257,26 @@ export default function AdminDoctors() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-bold text-primary">Doctor Verification (Blockchain)</h1>
-              <div className="mt-2 flex items-center gap-4 text-xs">
-                <span className="font-mono text-blue-600">
+              <h1 className="text-3xl font-bold text-primary tracking-tight">Doctor Verification</h1>
+              <div className="mt-3 flex items-center gap-4 text-sm">
+                <span className="font-mono text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
                   Contract: {doctorRegistryAddress?.slice(0, 10)}...{doctorRegistryAddress?.slice(-8)}
                 </span>
-                <span className="text-gray-500">|</span>
-                <span className="text-blue-600">Chain {chainId}</span>
+                <span className="text-gray-400">•</span>
+                <span className="text-blue-600 font-medium">Chain {chainId}</span>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center">
               <button
                 onClick={() => {
                   refetchTotal();
                   fetchAllDoctors();
                 }}
                 disabled={loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 text-sm font-medium"
+                className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 font-semibold"
               >
                 {loading ? 'Loading...' : 'Refresh'}
               </button>
-              <Link
-                href="/admin"
-                className="px-4 py-2 text-secondary hover:text-primary transition font-medium text-sm"
-              >
-                ← Back
-              </Link>
             </div>
           </div>
         </div>
@@ -317,31 +311,31 @@ export default function AdminDoctors() {
         {/* Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="glass-card rounded-xl p-6 border border-blue-200">
-            <h3 className="text-sm font-semibold text-secondary mb-1">Total Registrations</h3>
+            <h3 className="text-sm font-bold text-secondary mb-2">Total Registrations</h3>
             <p className="text-4xl font-bold text-blue-600">{numTotalRegistrations}</p>
-            <p className="text-xs text-gray-500 mt-2">From blockchain</p>
+            <p className="text-sm text-gray-500 mt-2 font-medium">From blockchain</p>
           </div>
           <div className="glass-card rounded-xl p-6 border border-yellow-200 bg-yellow-50">
-            <h3 className="text-sm font-semibold text-secondary mb-1">Pending</h3>
+            <h3 className="text-sm font-bold text-secondary mb-2">Pending</h3>
             <p className="text-4xl font-bold text-yellow-600">{countByStatus('pending')}</p>
-            <p className="text-xs text-gray-500 mt-2">Awaiting approval</p>
+            <p className="text-sm text-gray-500 mt-2 font-medium">Awaiting approval</p>
           </div>
           <div className="glass-card rounded-xl p-6 border border-green-200 bg-green-50">
-            <h3 className="text-sm font-semibold text-secondary mb-1">Approved</h3>
+            <h3 className="text-sm font-bold text-secondary mb-2">Approved</h3>
             <p className="text-4xl font-bold text-green-600">{countByStatus('approved')}</p>
-            <p className="text-xs text-gray-500 mt-2">Active doctors</p>
+            <p className="text-sm text-gray-500 mt-2 font-medium">Active doctors</p>
           </div>
           <div className="glass-card rounded-xl p-6 border border-red-200 bg-red-50">
-            <h3 className="text-sm font-semibold text-secondary mb-1">Denied</h3>
+            <h3 className="text-sm font-bold text-secondary mb-2">Denied</h3>
             <p className="text-4xl font-bold text-red-600">{countByStatus('denied')}</p>
-            <p className="text-xs text-gray-500 mt-2">Rejected</p>
+            <p className="text-sm text-gray-500 mt-2 font-medium">Rejected</p>
           </div>
         </div>
 
         {/* Filters */}
         <div className="mb-8">
           <div className="glass-card rounded-xl p-6 border border-blue-200">
-            <h2 className="text-lg font-semibold text-primary mb-4">Filter by Status</h2>
+            <h2 className="text-xl font-bold text-primary mb-4">Filter by Status</h2>
             <div className="flex flex-wrap gap-3">
               {[
                 { key: 'all', label: 'All Doctors' },
@@ -352,11 +346,10 @@ export default function AdminDoctors() {
                 <button
                   key={filterOption.key}
                   onClick={() => setFilter(filterOption.key as any)}
-                  className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all ${
-                    filter === filterOption.key
+                  className={`px-6 py-3 rounded-full font-bold transition-all ${filter === filterOption.key
                       ? 'bg-blue-600 text-white shadow-lg scale-105'
                       : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                  }`}
+                    }`}
                 >
                   {filterOption.label}
                 </button>
@@ -369,8 +362,8 @@ export default function AdminDoctors() {
         {loading || loadingTotal ? (
           <div className="glass-card rounded-xl p-12 text-center border border-blue-200">
             <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-6"></div>
-            <p className="text-lg font-medium text-primary">Loading from blockchain...</p>
-            <p className="text-sm text-secondary mt-2">This may take a few moments</p>
+            <p className="text-xl font-bold text-primary">Loading from blockchain...</p>
+            <p className="text-base text-secondary mt-2 font-medium">This may take a few moments</p>
           </div>
         ) : filteredDoctors.length > 0 ? (
           <div className="space-y-4">
@@ -383,27 +376,27 @@ export default function AdminDoctors() {
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-xl font-bold text-primary truncate">
-                        Dr. {doctor.name}
+                      <h3 className="text-2xl font-bold text-primary truncate tracking-tight">
+                       {doctor.name}
                       </h3>
-                      <p className="text-blue-600 font-medium">{doctor.specialization}</p>
+                      <p className="text-blue-600 font-bold text-lg">{doctor.specialization}</p>
 
                       <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div>
-                          <div className="text-xs text-secondary mb-1">Email</div>
-                          <div className="font-medium text-primary text-sm truncate">{doctor.email}</div>
+                          <div className="text-sm text-secondary mb-1 font-bold">Email</div>
+                          <div className="font-semibold text-primary truncate">{doctor.email}</div>
                         </div>
 
                         <div>
-                          <div className="text-xs text-secondary mb-1">Wallet</div>
-                          <div className="font-mono text-xs text-primary">
+                          <div className="text-sm text-secondary mb-1 font-bold">Wallet</div>
+                          <div className="font-mono text-sm text-primary font-semibold">
                             {doctor.walletAddress.slice(0, 10)}...{doctor.walletAddress.slice(-8)}
                           </div>
                         </div>
 
                         <div>
-                          <div className="text-xs text-secondary mb-1">Fee/Hour</div>
-                          <div className="font-semibold text-primary">
+                          <div className="text-sm text-secondary mb-1 font-bold">Fee/Hour</div>
+                          <div className="font-bold text-primary text-lg">
                             ${doctor.consultationFeePerHour.toFixed(2)}
                           </div>
                         </div>
@@ -422,7 +415,7 @@ export default function AdminDoctors() {
 
                         <div>
                           <div className="text-xs text-secondary mb-1">License Document</div>
-                          <a 
+                          <a
                             href={`https://gateway.pinata.cloud/ipfs/${doctor.legalDocumentsIPFSHash}`}
                             target="_blank"
                             rel="noopener noreferrer"

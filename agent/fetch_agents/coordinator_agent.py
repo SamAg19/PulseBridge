@@ -8,7 +8,7 @@ This is the main user-facing agent that:
 4. Returns complete formatted response to users
 """
 
-from uagents import Agent, Context, Protocol
+from uagents import Agent, Context, Protocol, Model
 from fetch_agents.messages import (
     ChatMessage,
     ChatResponse,
@@ -20,6 +20,7 @@ from fetch_agents.messages import (
     AgentHealthResponse
 )
 from fetch_agents.web3_doctor_client import get_web3_doctor_client
+from typing import Dict
 import os
 from dotenv import load_dotenv
 import logging
@@ -62,7 +63,7 @@ active_sessions = {}
 logger.info(f"Coordinator Agent Address: {agent.address}")
 
 
-# ==================== CHAT PROTOCOL (User-Facing) ====================
+# CHAT PROTOCOL (User-Facing)
 
 chat_protocol = Protocol(name="Chat", version="1.0.0")
 
@@ -240,28 +241,34 @@ async def handle_specialist_response(ctx: Context, sender: str, msg: SpecialistA
         doctors=doctors
     )
 
-    # STEP 5: Send to user
-    user = active_sessions[session_id]["user"]
-    await ctx.send(
-        user,
-        ChatResponse(
-            response=formatted_response,
-            session_id=session_id,
-            metadata={
-                "specialty": msg.specialty,
-                "condition": msg.condition,
-                "urgency": msg.risk_level,
-                "doctors_found": len(doctors),
-                "metta_rules_total": active_sessions[session_id]["triage_response"]["matched_rules"] + msg.metta_rules_matched,
-                "asi_one_enhanced": msg.asi_one_enhanced
-            }
-        )
+    # Build response
+    chat_response = ChatResponse(
+        response=formatted_response,
+        session_id=session_id,
+        metadata={
+            "specialty": msg.specialty,
+            "condition": msg.condition,
+            "urgency": msg.risk_level,
+            "doctors_found": len(doctors),
+            "metta_rules_total": active_sessions[session_id]["triage_response"]["matched_rules"] + msg.metta_rules_matched,
+            "asi_one_enhanced": msg.asi_one_enhanced
+        }
     )
 
-    ctx.logger.info(f"Session {session_id}: Complete response sent to user")
-
-    # Cleanup session
-    del active_sessions[session_id]
+    # Check if this is REST mode (synchronous) or message mode (asynchronous)
+    if active_sessions[session_id].get("rest_mode"):
+        # REST MODE: Store response for REST handler to return
+        ctx.logger.info(f"Session {session_id}: REST mode - storing response")
+        active_sessions[session_id]["final_response"] = chat_response
+        active_sessions[session_id]["response_ready"] = True
+        # Don't delete session - REST handler will clean up
+    else:
+        # MESSAGE MODE: Send response back to user via mailbox
+        user = active_sessions[session_id]["user"]
+        await ctx.send(user, chat_response)
+        ctx.logger.info(f"Session {session_id}: Complete response sent to user")
+        # Cleanup session
+        del active_sessions[session_id]
 
 
 def _is_greeting(message: str) -> bool:
@@ -365,7 +372,7 @@ async def _send_error_response(ctx: Context, user: str, session_id: str, error: 
 agent.include(chat_protocol, publish_manifest=True)
 
 
-# ==================== HEALTH CHECK PROTOCOL ====================
+# HEALTH CHECK PROTOCOL
 
 health_protocol = Protocol(name="HealthCheck", version="1.0.0")
 
@@ -393,7 +400,108 @@ async def handle_health_check(ctx: Context, sender: str, msg: AgentHealthCheck):
 agent.include(health_protocol, publish_manifest=True)
 
 
-# ==================== STARTUP & INTERVALS ====================
+# REST ENDPOINT (Web Integration)
+
+# Define request/response models for REST endpoint
+class RestChatRequest(Model):
+    """REST API request for web frontend"""
+    message: str
+
+class RestChatResponse(Model):
+    """REST API response for web frontend"""
+    response: str
+    session_id: str
+    metadata: Dict = {}
+
+# Add REST endpoint for web frontend integration
+@agent.on_rest_post("/chat", RestChatRequest, RestChatResponse)
+async def handle_rest_chat(ctx: Context, req: RestChatRequest) -> RestChatResponse:
+    """
+    REST endpoint for web frontend via uagent-client
+
+    This provides a synchronous interface that waits for the async
+    multi-agent workflow to complete before returning.
+    """
+    ctx.logger.info(f"Received REST chat request: {req.message[:50]}...")
+
+    # Generate session ID
+    session_id = f"web-{datetime.now().timestamp()}"
+
+    # Check for greeting
+    if _is_greeting(req.message):
+        return RestChatResponse(
+            response=_get_welcome_message(),
+            session_id=session_id,
+            metadata={"type": "greeting"}
+        )
+
+    # Create session for async workflow
+    active_sessions[session_id] = {
+        "user": "web-frontend",
+        "symptoms": req.message,
+        "timestamp": datetime.now().isoformat(),
+        "triage_response": None,
+        "specialist_response": None,
+        "rest_mode": True,
+        "response_ready": False,
+        "final_response": None
+    }
+
+    ctx.logger.info(f"Session {session_id}: Starting multi-agent consultation (REST MODE)")
+
+    # Check if triage agent is configured
+    if not TRIAGE_AGENT_ADDRESS:
+        return RestChatResponse(
+            response="⚠️ System configuration error: Triage agent not available. Please contact support.",
+            session_id=session_id,
+            metadata={"type": "error", "error": "triage_not_configured"}
+        )
+
+    # Send to triage agent
+    await ctx.send(
+        TRIAGE_AGENT_ADDRESS,
+        SymptomRoutingRequest(
+            symptoms=req.message,
+            patient_age=None,
+            patient_gender=None,
+            medical_history=[],
+            session_id=session_id
+        )
+    )
+
+    # Wait for response (with timeout)
+    max_wait = 60  # 60 seconds
+    wait_interval = 0.5
+    elapsed = 0
+
+    while elapsed < max_wait:
+        await asyncio.sleep(wait_interval)
+        elapsed += wait_interval
+
+        if active_sessions.get(session_id, {}).get("response_ready"):
+            final_response = active_sessions[session_id]["final_response"]
+            # Clean up session
+            del active_sessions[session_id]
+            ctx.logger.info(f"Session {session_id}: Returning REST response")
+            return RestChatResponse(
+                response=final_response.response,
+                session_id=final_response.session_id,
+                metadata=final_response.metadata
+            )
+
+    # Timeout
+    ctx.logger.warning(f"Session {session_id}: REST request timeout after {max_wait}s")
+    if session_id in active_sessions:
+        del active_sessions[session_id]
+
+    return RestChatResponse(
+        response="⏳ Sorry, the analysis is taking longer than expected. Please try again in a moment.",
+        session_id=session_id,
+        metadata={"type": "timeout", "error": "agent_timeout"}
+    )
+
+
+# STARTUP & INTERVALS
 
 @agent.on_event("startup")
 async def startup(ctx: Context):

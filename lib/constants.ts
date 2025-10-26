@@ -11,8 +11,8 @@ export const chains
   },
   // Sepolia testnet
   11155111: {
-    DoctorRegistry: "0x3328c329855cd53e0dcb25d90bab5e10d8665d04",
-    ConsultationEscrow: "0xd96202e764c26277ad9a058e5e5e26fd4addcd7c",
+    DoctorRegistry: "0xfce137ce96de06f7fad34fcbf28cf15b5b1ebd26",
+    ConsultationEscrow: "0x49e66a04de37d981844d29f8250a4fe9d8f56c74",
     PYUSD: "0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9",
     USDC: "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238",
     USDT: "0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0",

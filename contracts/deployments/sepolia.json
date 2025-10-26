@@ -10,12 +10,12 @@
     "pythOracle": "0xDd24F84d36BF92C65F92307595335bdFab5Bbd21"
   },
   "contracts": {
-    "pythPriceConsumer": "0x4c7bc617726363602b50aa95348a9d6f483e3414",
-    "doctorRegistry": "0x3328c329855cd53e0dcb25d90bab5e10d8665d04",
-    "consultationEscrow": "0xd96202e764c26277ad9a058e5e5e26fd4addcd7c"
+    "pythPriceConsumer": "0xe21e15517e0031e269a3bf737e345f23354b83a8",
+    "doctorRegistry": "0xfce137ce96de06f7fad34fcbf28cf15b5b1ebd26",
+    "consultationEscrow": "0x49e66a04de37d981844d29f8250a4fe9d8f56c74"
   },
   "parameters": {
-    "doctorDepositFee": "1000000",
-    "doctorStakeAmount": "3000000"
+    "doctorDepositFee": "100000",
+    "doctorStakeAmount": "300000"
   }
 }

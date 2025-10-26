@@ -80,7 +80,7 @@ const pyusdBalance = await pyusdContract.read.balanceOf([depositor.account.addre
 console.log("Current PYUSD balance:", formatUnits(pyusdBalance, 6), "PYUSD");
 
 // Get deposit amount from environment variable or use default
-const depositAmountStr = process.env.DEPOSIT_AMOUNT || "50";
+const depositAmountStr = process.env.DEPOSIT_AMOUNT || "30";
 const depositAmount = parseUnits(depositAmountStr, 6); // PYUSD has 6 decimals
 
 console.log("Deposit amount:", formatUnits(depositAmount, 6), "PYUSD");

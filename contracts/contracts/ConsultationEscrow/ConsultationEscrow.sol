@@ -123,13 +123,22 @@ contract ConsultationEscrow is AccessControl, ReentrancyGuard {
 
         // Transfer payment tokens from patient to contract
         if (address(paymentMethod) == address(0)) {
-            if (pyusdValue > consultationPayment) {
-                uint256 pyusdreturned = pyusdValue - consultationPayment;
-                pyusd.safeTransfer(msg.sender, pyusdreturned);
-                pyUSDReserveBalance -= pyusdreturned;
+            // For ETH payments, refund excess pyUSD if pyusdValue exceeds what was needed
+            if (pyusdValue > pyusdNeeded) {
+                uint256 excessPyusd = pyusdValue - pyusdNeeded;
+                pyusd.safeTransfer(msg.sender, excessPyusd);
+                pyUSDReserveBalance -= excessPyusd;
             }
         } else {
+            // Transfer the full payment amount from user
             IERC20(paymentMethod).safeTransferFrom(msg.sender, address(this), consultationPayment);
+
+            // Refund excess value in pyUSD if user sent more than needed
+            if (pyusdValue > pyusdNeeded) {
+                uint256 excessPyusd = pyusdValue - pyusdNeeded;
+                pyusd.safeTransfer(msg.sender, excessPyusd);
+                pyUSDReserveBalance -= excessPyusd;
+            }
         }
 
         emit SessionCreated(sessionId, doctorId, msg.sender, doctor.consultationFeePerHour, pyusdNeeded);

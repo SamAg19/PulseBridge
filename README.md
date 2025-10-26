@@ -120,7 +120,10 @@ Live demo:
 * * *
 
 ## Future Developments
+* Reclaim for verifying documents and get generated QR for proofs
+* Feedback mechanism for patients to give review for there doctor sessions
+* Tracking jisti meeting links for attendance and then sending the balances after verified
+* ASI Agents adding more agents to make the chatbot much more efficient on there responses
+* Implementing comprehensive privacy safeguards is essential to ensure user data protection and maintain compliance with applicable legal regulations.
 
 * * *
-
-_._

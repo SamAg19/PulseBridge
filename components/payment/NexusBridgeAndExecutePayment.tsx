@@ -156,9 +156,11 @@ export default function NexusBridgeAndExecutePayment({
     try {
       setStatus('bridging');
       setError('');
+      const feeWithSurcharge = consultationFee * 1.2;
+      const paymentAmount = parseUnits(feeWithSurcharge.toFixed(6), 6);
 
       // Convert fee to proper decimals (6 for stablecoins)
-      const paymentAmount = parseUnits(consultationFee.toFixed(6), 6);
+
       setStatus('executing');
 
 
@@ -297,7 +299,7 @@ export default function NexusBridgeAndExecutePayment({
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600">Amount</span>
               <span className="font-semibold text-gray-900">
-                {consultationFee.toFixed(2)} {selectedToken}
+                {consultationFee.toFixed(2) * 1.2} {selectedToken}
               </span>
             </div>
             <div className="flex justify-between items-center">

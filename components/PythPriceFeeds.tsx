@@ -171,7 +171,7 @@ export default function PythPriceFeeds({ className = '', onPricesUpdate }: PythP
         {prices.map((priceData) => (
           <div key={priceData.symbol} className="flex items-center justify-between p-4 bg-sky-100/50 rounded-lg border border-sky-200 hover:bg-sky-100 transition-colors">
             <div className="flex items-center space-x-4">
-              <div className="w-14 h-14 bg-gradient-to-br from-sky-500 to-sky-600 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg">
+              <div className="w-14 h-14 bg-linear-to-br from-sky-500 to-sky-600 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg">
                 {priceData.symbol}
               </div>
               <div>

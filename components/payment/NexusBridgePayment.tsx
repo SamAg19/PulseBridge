@@ -104,7 +104,7 @@ export default function NexusBridgePayment({
           <button
             onClick={() => handleBridgeClick(onClick)}
             disabled={isLoading || isInitializing}
-            className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full px-6 py-3 bg-linear-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading || isInitializing ? (
               <div className="flex items-center justify-center">

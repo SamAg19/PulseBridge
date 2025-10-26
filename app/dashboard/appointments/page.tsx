@@ -10,6 +10,8 @@ import { useGetDoctorID, useReleasePayment } from '@/lib/contracts/hooks';
 import { Session } from '@/lib/types';
 import { readContract } from '@wagmi/core';
 import { chains, DoctorRegistry } from '@/lib/constants';
+import { generateJitsiMeetingLink } from '@/lib/utils/jitsi';
+import { Video } from 'lucide-react';
 
 interface SessionWithStatus extends Session {
   computedStatus: 'confirmed' | 'pending' | 'completed';
@@ -437,6 +439,19 @@ export default function DoctorAppointments() {
                           <strong>Action Required:</strong> Session time has passed. Fill prescription details to complete and release payment.
                         </p>
 
+                        {/* Jitsi Meeting Link */}
+                        <div className="mb-3">
+                          <a
+                            href={generateJitsiMeetingLink(session.sessionId, session.doctorId, session.patient)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                          >
+                            <Video className="w-4 h-4 mr-2" />
+                            Join Video Consultation
+                          </a>
+                        </div>
+
                         {/* Show button to open form if not shown yet */}
                         {!showPrescriptionForm[session.sessionId] && !prescriptionIPFS[session.sessionId] && (
                           <button
@@ -617,9 +632,19 @@ export default function DoctorAppointments() {
                     {/* Upcoming Session Info */}
                     {session.computedStatus === 'confirmed' && (
                       <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <p className="text-sm text-blue-800">
+                        <p className="text-sm text-blue-800 mb-3">
                           <strong>Upcoming:</strong> Session scheduled for {formatDate(session.startTime)} at {formatTime(session.startTime)}
                         </p>
+                        {/* Jitsi Meeting Link */}
+                        <a
+                          href={generateJitsiMeetingLink(session.sessionId, session.doctorId, session.patient)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                        >
+                          <Video className="w-4 h-4 mr-2" />
+                          Join Video Consultation
+                        </a>
                       </div>
                     )}
                   </div>

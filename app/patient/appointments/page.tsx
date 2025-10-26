@@ -8,6 +8,8 @@ import { Calendar, Clock, TrendingUp, DollarSign, Filter } from 'lucide-react';
 import { getPatientSessionsWithDetails } from '@/lib/contracts/utils';
 import { Session } from '@/lib/types';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { generateJitsiMeetingLink } from '@/lib/utils/jitsi';
+import { Video } from 'lucide-react';
 
 interface SessionWithStatus extends Session {
   computedStatus: 'confirmed' | 'pending' | 'completed';
@@ -304,6 +306,21 @@ export default function PatientAppointmentsPage() {
                           </div>
                         </div>
                       </div>
+
+                      {/* Jitsi Meeting Link - Show for confirmed and pending sessions */}
+                      {(session.computedStatus === 'confirmed' || session.computedStatus === 'pending') && (
+                        <div className="mt-4">
+                          <a
+                            href={generateJitsiMeetingLink(session.sessionId, session.doctorId, session.patient)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                          >
+                            <Video className="w-4 h-4 mr-2" />
+                            Join Video Consultation
+                          </a>
+                        </div>
+                      )}
 
                       {session.prescriptionIPFSHash && session.prescriptionIPFSHash.length > 0 && (
                         <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">

@@ -7,8 +7,8 @@ import { TimeSlot } from '@/lib/types';
 export default function CreateTaskForm() {
   const { user } = useAuth();
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
+    title: 'General Medical Consultation',
+    description: 'Comprehensive medical consultation including symptom assessment, medical history review, and treatment recommendations.',
     category: 'consultation' as const,
     duration: 30,
     fee: 0,
@@ -44,6 +44,20 @@ export default function CreateTaskForm() {
         />
       </div>
       <div>
+        <label htmlFor="category" className="block text-sm font-medium">Service Type</label>
+        <select
+          id="category"
+          value={formData.category}
+          onChange={(e) => setFormData({...formData, category: e.target.value as 'consultation'})}
+          className="mt-1 block w-full rounded-md border-gray-300"
+          required
+        >
+          <option value="consultation">General Consultation</option>
+          <option value="specialist">Specialist Consultation</option>
+          <option value="urgent">Urgent Consultation</option>
+        </select>
+      </div>
+      <div>
         <label htmlFor="description" className="block text-sm font-medium">Description</label>
         <textarea
           id="description"
@@ -52,6 +66,7 @@ export default function CreateTaskForm() {
           className="mt-1 block w-full rounded-md border-gray-300"
           rows={4}
           required
+          placeholder="Describe what this consultation includes, what patients can expect, and any special requirements..."
         />
       </div>
       <div className="grid grid-cols-2 gap-4">

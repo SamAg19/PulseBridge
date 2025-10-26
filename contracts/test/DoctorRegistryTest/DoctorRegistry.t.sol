@@ -18,8 +18,8 @@ contract DoctorRegistryTest is Test {
     uint256 stakeAmount = 5e6;
     uint256 depositFee = 1e6;
 
-    bytes32 validDocIPFSHash = keccak256(abi.encodePacked("validDocumentsHash"));
-    bytes32 invalidDocIPFSHash = keccak256(abi.encodePacked("invalidDocumentsHash"));
+    string validDocIPFSHash = "validDocumentsHash";
+    string invalidDocIPFSHash = " ";
 
     string profileDescription =
         "Experienced mental health therapist specializing in cognitive behavioral therapy and mindfulness techniques.";
@@ -54,15 +54,15 @@ contract DoctorRegistryTest is Test {
         vm.startPrank(alice);
         PYUSD.approve(address(DocReg), currentStakeAmount);
         vm.expectRevert("Legal documents IPFS hash is required!");
-        DocReg.registerAsDoctor(
-            "Alice", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, bytes32(0)
-        );
+        DocReg.registerAsDoctor("Alice", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, "");
 
         DocReg.registerAsDoctor(
             "Alice", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, validDocIPFSHash
         );
 
         Structs.RegStruct memory ExpectedReturn = Structs.RegStruct(
+            1,
+            0,
             "Alice",
             "Mental-Health-Therapy",
             profileDescription,
@@ -73,8 +73,10 @@ contract DoctorRegistryTest is Test {
             validDocIPFSHash
         );
 
-        assertEq(keccak256(abi.encode(ExpectedReturn)), keccak256(abi.encode(DocReg.getPendingDoctor(1))));
+        (Structs.RegStruct memory PendingDoctor, uint8 status) = DocReg.getPendingDoctor(alice);
+        assertEq(keccak256(abi.encode(ExpectedReturn)), keccak256(abi.encode(PendingDoctor)));
         uint256 balanceAfter = PYUSD.balanceOf(alice);
+        assertEq(0, status);
 
         assertEq(balanceBefore - currentStakeAmount, balanceAfter);
         assertEq(PYUSD.balanceOf(address(DocReg)), currentStakeAmount);
@@ -86,7 +88,7 @@ contract DoctorRegistryTest is Test {
 
         vm.startPrank(alice);
         vm.expectRevert();
-        DocReg.approveDoctor(1);
+        DocReg.approveDoctor(alice);
 
         PYUSD.approve(address(DocReg), currentStakeAmount);
         DocReg.registerAsDoctor(
@@ -95,11 +97,13 @@ contract DoctorRegistryTest is Test {
 
         vm.startPrank(approver);
         vm.expectEmit(true, true, true, true);
-        emit DoctorRegistry.DoctorApproved(1);
+        emit DoctorRegistry.DoctorApproved(alice, 1, 1);
 
-        DocReg.approveDoctor(1);
+        DocReg.approveDoctor(alice);
 
         Structs.RegStruct memory ExpectedReturn = Structs.RegStruct(
+            1,
+            1,
             "Alice",
             "Mental-Health-Therapy",
             profileDescription,
@@ -111,6 +115,7 @@ contract DoctorRegistryTest is Test {
         );
 
         assertEq(keccak256(abi.encode(ExpectedReturn)), keccak256(abi.encode(DocReg.getDoctor(1))));
+        assertEq(1, DocReg.isRegisterIDApproved(1));
         assertEq(DocReg.getDoctorID(alice), 1);
         uint256 balanceAfter = PYUSD.balanceOf(alice);
 
@@ -123,15 +128,17 @@ contract DoctorRegistryTest is Test {
         uint256 balanceBefore = PYUSD.balanceOf(alice);
 
         vm.expectRevert();
-        DocReg.denyDoctor(1);
+        DocReg.denyDoctor(alice);
 
         vm.startPrank(approver);
         vm.expectEmit(true, true, true, true);
-        emit DoctorRegistry.DoctorDenied(1);
+        emit DoctorRegistry.DoctorDenied(alice, 1);
 
-        DocReg.denyDoctor(1);
+        DocReg.denyDoctor(alice);
 
         Structs.RegStruct memory ExpectedReturn = Structs.RegStruct(
+            1,
+            0,
             "Alice",
             "Mental-Health-Therapy",
             profileDescription,
@@ -143,8 +150,10 @@ contract DoctorRegistryTest is Test {
         );
 
         uint256 balanceAfter = PYUSD.balanceOf(alice);
-
+        (Structs.RegStruct memory PendingDoctor, uint8 status) = DocReg.getPendingDoctor(alice);
+        assertEq(keccak256(abi.encode(ExpectedReturn)), keccak256(abi.encode(PendingDoctor)));
         assertNotEq(keccak256(abi.encode(ExpectedReturn)), keccak256(abi.encode(DocReg.getDoctor(1))));
+        assertEq(2, status);
         assertEq(balanceBefore, balanceAfter);
         assertEq(PYUSD.balanceOf(address(DocReg)), stakeAmount);
     }

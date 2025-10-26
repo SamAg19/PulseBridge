@@ -1,72 +1,94 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAccount } from 'wagmi';
+import { useAccount, useChainId } from 'wagmi';
 import Link from 'next/link';
-import { createTask } from '@/lib/firebase/firestore';
 import { TimeSlot } from '@/lib/types';
-
-const categories = [
-  {
-    id: 'consultation',
-    name: 'Consultation',
-    icon: '🩺',
-    description: 'General medical consultation and diagnosis',
-    color: 'from-blue-500 to-blue-600'
-  },
-  {
-    id: 'procedure',
-    name: 'Procedure',
-    icon: '⚕️',
-    description: 'Medical procedures and treatments',
-    color: 'from-purple-500 to-purple-600'
-  },
-  {
-    id: 'followup',
-    name: 'Follow-up',
-    icon: '📋',
-    description: 'Follow-up appointments and check-ups',
-    color: 'from-green-500 to-green-600'
-  }
-];
+import { setDoctorAvailability, getDoctorAvailability } from '@/lib/firebase/availability';
+import { useGetDoctorID } from '@/lib/contracts/hooks';
 
 const durations = [15, 30, 45, 60, 90, 120];
 
 export default function CreateTaskPage() {
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
   const router = useRouter();
-  const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    category: 'consultation' as const,
-    duration: 30,
-    fee: 0,
-  });
+  const [duration, setDuration] = useState(30);
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [currentSlot, setCurrentSlot] = useState({ date: '', startTime: '', endTime: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  const { doctorId, isLoading: loadingDoctorId } = useGetDoctorID(address);
+
+  // Calculate preview of slots count
+  const calculatePreviewSlotsCount = () => {
+    if (!currentSlot.startTime || !currentSlot.endTime) return 0;
+
+    const startDateTime = new Date(`2000-01-01T${currentSlot.startTime}:00`);
+    const endDateTime = new Date(`2000-01-01T${currentSlot.endTime}:00`);
+
+    if (endDateTime <= startDateTime) return 0;
+
+    const totalMinutes = (endDateTime.getTime() - startDateTime.getTime()) / 60000;
+    return Math.floor(totalMinutes / duration);
+  };
+
+  const previewSlotsCount = calculatePreviewSlotsCount();
+
+  useEffect(() => {
+    if (!isConnected) {
+      router.push('/');
+    }
+  }, [isConnected, router]);
+
   if (!isConnected) {
-    router.push('/');
     return null;
   }
 
-  const nextStep = () => {
-    if (step < 3) setStep(step + 1);
-  };
-
-  const prevStep = () => {
-    if (step > 1) setStep(step - 1);
-  };
-
-  const addSlot = () => {
-    if (currentSlot.date && currentSlot.startTime && currentSlot.endTime) {
-      setSlots([...slots, currentSlot]);
-      setCurrentSlot({ date: '', startTime: '', endTime: '' });
+  const generateTimeSlots = () => {
+    if (!currentSlot.date || !currentSlot.startTime || !currentSlot.endTime) {
+      return;
     }
+
+    // Parse start and end times
+    const startDateTime = new Date(`2000-01-01T${currentSlot.startTime}:00`);
+    const endDateTime = new Date(`2000-01-01T${currentSlot.endTime}:00`);
+
+    // Validate that end time is after start time
+    if (endDateTime <= startDateTime) {
+      setError('End time must be after start time');
+      return;
+    }
+
+    // Generate slots
+    const newSlots: TimeSlot[] = [];
+    let currentTime = new Date(startDateTime);
+
+    while (currentTime < endDateTime) {
+      const slotEndTime = new Date(currentTime.getTime() + duration * 60000);
+
+      // Only add slot if it doesn't exceed the end time
+      if (slotEndTime <= endDateTime) {
+        newSlots.push({
+          date: currentSlot.date,
+          startTime: currentTime.toTimeString().slice(0, 5),
+          endTime: slotEndTime.toTimeString().slice(0, 5)
+        });
+      }
+
+      currentTime = slotEndTime;
+    }
+
+    if (newSlots.length === 0) {
+      setError('Time range is too short for the selected duration');
+      return;
+    }
+
+    setSlots([...slots, ...newSlots]);
+    setCurrentSlot({ date: '', startTime: '', endTime: '' });
+    setError('');
   };
 
   const removeSlot = (index: number) => {
@@ -74,22 +96,36 @@ export default function CreateTaskPage() {
   };
 
   const handleSubmit = async () => {
-    if (!address) return;
+    if (!address || !doctorId || slots.length === 0) return;
 
     setSubmitting(true);
     setError('');
 
     try {
-      await createTask({
-        ...formData,
-        doctorId: address,
-        dateTimeSlots: slots,
-        currency: 'PYUSD',
-        status: 'draft',
-      });
-      router.push('/dashboard/tasks');
+      console.log('Saving availability for doctor ID:', doctorId);
+      console.log('Wallet address:', address);
+      console.log('New slots to add:', slots.length);
+
+      // Get existing availability
+      const existingAvailability = await getDoctorAvailability(address);
+      console.log('Existing availability:', existingAvailability);
+
+      // Merge new slots with existing ones
+      const existingSlots = existingAvailability?.timeSlots || [];
+      console.log('Existing slots count:', existingSlots.length);
+
+      const allSlots = [...existingSlots, ...slots];
+      console.log('Total slots after merge:', allSlots.length);
+
+      // Save to Firebase availability collection
+      await setDoctorAvailability(doctorId, address, allSlots);
+      console.log('Successfully saved to Firebase');
+
+      alert(`Successfully added ${slots.length} time slot${slots.length > 1 ? 's' : ''}!`);
+      router.push('/dashboard');
     } catch (err: any) {
       setError(err.message);
+      console.error('Error saving availability:', err);
     } finally {
       setSubmitting(false);
     }
@@ -107,41 +143,22 @@ export default function CreateTaskPage() {
             Back to Dashboard
           </Link>
           <div className="text-sm text-secondary">
-            Step {step} of 3
+            Publish Availability
           </div>
         </div>
       </nav>
 
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
-          {/* Progress Bar */}
-          <div className="mb-8">
-            <div className="flex items-center justify-center mb-6">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all duration-300 ${i <= step ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'
-                    }`}>
-                    {i}
-                  </div>
-                  {i < 3 && (
-                    <div className={`w-16 h-1 mx-2 rounded transition-all duration-300 ${i < step ? 'bg-blue-600' : 'bg-gray-200'
-                      }`} />
-                  )}
-                </div>
-              ))}
+          {/* Header */}
+          <div className="mb-8 text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+              <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
             </div>
-            <div className="text-center">
-              <h1 className="text-3xl font-bold text-primary mb-2">
-                {step === 1 && 'Service Details'}
-                {step === 2 && 'Pricing & Duration'}
-                {step === 3 && 'Availability'}
-              </h1>
-              <p className="text-secondary">
-                {step === 1 && 'Tell us about the medical service you want to offer'}
-                {step === 2 && 'Set your pricing and appointment duration'}
-                {step === 3 && 'Add your available time slots'}
-              </p>
-            </div>
+            <h1 className="text-3xl font-bold text-primary mb-2">Publish Your Availability</h1>
+            <p className="text-secondary">Set your available time slots. Patients will be able to view and book these slots for consultations.</p>
           </div>
 
           {error && (
@@ -155,268 +172,154 @@ export default function CreateTaskPage() {
             </div>
           )}
 
-          {/* Step 1: Service Details */}
-          {step === 1 && (
-            <div className="glass-card rounded-2xl p-8 animate-fadeInUp">
-              <div className="space-y-8">
-                <div>
-                  <label className="block text-sm font-semibold text-primary mb-3">
-                    Service Title
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full px-4 py-4 bg-white border border-blue-200 rounded-xl text-gray-900 placeholder-gray-500 input-focus focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., General Health Consultation"
-                    required
-                  />
+          <div className="glass-card rounded-2xl p-8 animate-fadeInUp">
+            <div className="space-y-8">
+              {/* Duration Selection */}
+              <div>
+                <label className="block text-sm font-semibold text-primary mb-4">
+                  Consultation Duration
+                </label>
+                <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+                  {durations.map((dur) => (
+                    <button
+                      key={dur}
+                      type="button"
+                      onClick={() => setDuration(dur)}
+                      className={`p-4 rounded-xl font-medium transition-all duration-300 ${duration === dur
+                          ? 'bg-blue-600 text-white shadow-lg transform scale-105'
+                          : 'bg-white border border-blue-200 text-primary hover:border-blue-300'
+                        }`}
+                    >
+                      {dur}min
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-sm text-secondary">
+                  Select the duration for each consultation slot. We'll automatically create multiple slots based on your time range.
+                </p>
+              </div>
+
+              {/* Time Slot Addition */}
+              <div>
+                <h3 className="text-lg font-semibold text-primary mb-4">Generate Consultation Time Slots</h3>
+                <p className="text-sm text-secondary mb-4">
+                  Select a date and time range. We'll automatically create {duration}-minute time slots for you.
+                </p>
+                <div className="grid md:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-primary mb-2">Date</label>
+                    <input
+                      type="date"
+                      value={currentSlot.date}
+                      onChange={(e) => setCurrentSlot({ ...currentSlot, date: e.target.value })}
+                      className="w-full px-4 py-3 bg-white border border-blue-200 rounded-xl input-focus focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      min={new Date().toISOString().split('T')[0]}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-primary mb-2">Start Time</label>
+                    <input
+                      type="time"
+                      value={currentSlot.startTime}
+                      onChange={(e) => setCurrentSlot({ ...currentSlot, startTime: e.target.value })}
+                      className="w-full px-4 py-3 bg-white border border-blue-200 rounded-xl input-focus focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      step="900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-primary mb-2">End Time</label>
+                    <input
+                      type="time"
+                      value={currentSlot.endTime}
+                      onChange={(e) => setCurrentSlot({ ...currentSlot, endTime: e.target.value })}
+                      className="w-full px-4 py-3 bg-white border border-blue-200 rounded-xl input-focus focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      step="900"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-primary mb-3">
-                    Service Description
-                  </label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full px-4 py-4 bg-white border border-blue-200 rounded-xl text-gray-900 placeholder-gray-500 input-focus focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    rows={4}
-                    placeholder="Describe what this service includes, what patients can expect, and any special requirements..."
-                    required
-                  />
-                </div>
+                {/* Preview of slots to be generated */}
+                {previewSlotsCount > 0 && (
+                  <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <p className="text-sm text-blue-800">
+                      <strong>{previewSlotsCount}</strong> time slot{previewSlotsCount > 1 ? 's' : ''} will be generated ({duration} minutes each)
+                    </p>
+                  </div>
+                )}
 
-                <div>
-                  <label className="block text-sm font-semibold text-primary mb-4">
-                    Service Category
-                  </label>
-                  <div className="grid md:grid-cols-3 gap-4">
-                    {categories.map((category) => (
-                      <div
-                        key={category.id}
-                        onClick={() => setFormData({ ...formData, category: category.id as any })}
-                        className={`p-6 rounded-xl cursor-pointer transition-all duration-300 transform hover:scale-105 ${formData.category === category.id
-                            ? 'bg-gradient-to-r ' + category.color + ' text-white shadow-lg'
-                            : 'bg-white border border-blue-200 hover:border-blue-300'
-                          }`}
-                      >
-                        <div className="text-3xl mb-3">{category.icon}</div>
-                        <h3 className={`font-semibold mb-2 ${formData.category === category.id ? 'text-white' : 'text-primary'
-                          }`}>
-                          {category.name}
-                        </h3>
-                        <p className={`text-sm ${formData.category === category.id ? 'text-blue-100' : 'text-secondary'
-                          }`}>
-                          {category.description}
-                        </p>
+                <button
+                  type="button"
+                  onClick={generateTimeSlots}
+                  disabled={!currentSlot.date || !currentSlot.startTime || !currentSlot.endTime}
+                  className="mb-6 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                >
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Generate {previewSlotsCount > 0 ? previewSlotsCount : ''} Time Slot{previewSlotsCount !== 1 ? 's' : ''}
+                </button>
+
+                {slots.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-primary">Time Slots to Publish ({slots.length})</h4>
+                    {slots.map((slot, index) => (
+                      <div key={index} className="flex items-center justify-between p-4 bg-blue-50 rounded-xl border border-blue-200">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                          <span className="font-medium text-primary">
+                            {new Date(slot.date).toLocaleDateString('en-US', {
+                              weekday: 'short',
+                              month: 'short',
+                              day: 'numeric'
+                            })}
+                          </span>
+                          <span className="text-secondary">
+                            {slot.startTime} - {slot.endTime}
+                          </span>
+                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                            {duration}min
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeSlot(index)}
+                          className="text-red-600 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
                       </div>
                     ))}
                   </div>
-                </div>
+                )}
+
+                {slots.length === 0 && (
+                  <div className="text-center py-8 text-secondary">
+                    <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p>No time slots generated yet. Select a date and time range to continue.</p>
+                  </div>
+                )}
               </div>
+
+              {/* Summary */}
+              {slots.length > 0 && (
+                <div className="bg-green-50 rounded-xl p-6 border border-green-200">
+                  <h3 className="font-semibold text-green-800 mb-3">Summary</h3>
+                  <p className="text-sm text-green-700">
+                    You're publishing <strong>{slots.length}</strong> time slot{slots.length > 1 ? 's' : ''},
+                    each lasting <strong>{duration} minutes</strong>.
+                    These slots will be visible to patients and they can book them for consultations.
+                  </p>
+                </div>
+              )}
 
               <div className="flex justify-end mt-8">
                 <button
-                  onClick={nextStep}
-                  disabled={!formData.title || !formData.description}
-                  className="btn-primary text-white font-semibold py-3 px-8 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Continue
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Step 2: Pricing & Duration */}
-          {step === 2 && (
-            <div className="glass-card rounded-2xl p-8 animate-fadeInUp">
-              <div className="space-y-8">
-                <div>
-                  <label className="block text-sm font-semibold text-primary mb-4">
-                    Appointment Duration
-                  </label>
-                  <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-                    {durations.map((duration) => (
-                      <button
-                        key={duration}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, duration })}
-                        className={`p-4 rounded-xl font-medium transition-all duration-300 ${formData.duration === duration
-                            ? 'bg-blue-600 text-white shadow-lg transform scale-105'
-                            : 'bg-white border border-blue-200 text-primary hover:border-blue-300'
-                          }`}
-                      >
-                        {duration}min
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-primary mb-3">
-                    Service Fee (PYUSD)
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <span className="text-gray-500 text-lg">$</span>
-                    </div>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.fee}
-                      onChange={(e) => setFormData({ ...formData, fee: parseFloat(e.target.value) || 0 })}
-                      className="w-full pl-8 pr-4 py-4 bg-white border border-blue-200 rounded-xl text-gray-900 placeholder-gray-500 input-focus focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg font-medium"
-                      placeholder="0.00"
-                      required
-                    />
-                  </div>
-                  <p className="mt-2 text-sm text-secondary">
-                    Set a competitive price for your {formData.duration}-minute {formData.category}
-                  </p>
-                </div>
-
-                <div className="bg-blue-50 rounded-xl p-6 border border-blue-200">
-                  <h3 className="font-semibold text-primary mb-3">Service Summary</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-secondary">Service:</span>
-                      <span className="font-medium text-primary">{formData.title}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-secondary">Category:</span>
-                      <span className="font-medium text-primary capitalize">{formData.category}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-secondary">Duration:</span>
-                      <span className="font-medium text-primary">{formData.duration} minutes</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-secondary">Fee:</span>
-                      <span className="font-medium text-primary">${formData.fee} PYUSD</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-between mt-8">
-                <button
-                  onClick={prevStep}
-                  className="px-6 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-colors font-medium"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={nextStep}
-                  disabled={formData.fee <= 0}
-                  className="btn-primary text-white font-semibold py-3 px-8 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Continue
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: Availability */}
-          {step === 3 && (
-            <div className="glass-card rounded-2xl p-8 animate-fadeInUp">
-              <div className="space-y-8">
-                <div>
-                  <h3 className="text-lg font-semibold text-primary mb-4">Add Available Time Slots</h3>
-                  <div className="grid md:grid-cols-3 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-medium text-primary mb-2">Date</label>
-                      <input
-                        type="date"
-                        value={currentSlot.date}
-                        onChange={(e) => setCurrentSlot({ ...currentSlot, date: e.target.value })}
-                        className="w-full px-4 py-3 bg-white border border-blue-200 rounded-xl input-focus focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        min={new Date().toISOString().split('T')[0]}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-primary mb-2">Start Time</label>
-                      <input
-                        type="time"
-                        value={currentSlot.startTime}
-                        onChange={(e) => setCurrentSlot({ ...currentSlot, startTime: e.target.value })}
-                        className="w-full px-4 py-3 bg-white border border-blue-200 rounded-xl input-focus focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-primary mb-2">End Time</label>
-                      <input
-                        type="time"
-                        value={currentSlot.endTime}
-                        onChange={(e) => setCurrentSlot({ ...currentSlot, endTime: e.target.value })}
-                        className="w-full px-4 py-3 bg-white border border-blue-200 rounded-xl input-focus focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={addSlot}
-                    disabled={!currentSlot.date || !currentSlot.startTime || !currentSlot.endTime}
-                    className="mb-6 px-6 py-3 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    + Add Time Slot
-                  </button>
-
-                  {slots.length > 0 && (
-                    <div className="space-y-3">
-                      <h4 className="font-medium text-primary">Added Time Slots ({slots.length})</h4>
-                      {slots.map((slot, index) => (
-                        <div key={index} className="flex items-center justify-between p-4 bg-blue-50 rounded-xl border border-blue-200">
-                          <div className="flex items-center space-x-4">
-                            <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-                            <span className="font-medium text-primary">
-                              {new Date(slot.date).toLocaleDateString('en-US', {
-                                weekday: 'short',
-                                month: 'short',
-                                day: 'numeric'
-                              })}
-                            </span>
-                            <span className="text-secondary">
-                              {slot.startTime} - {slot.endTime}
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => removeSlot(index)}
-                            className="text-red-600 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 transition-colors"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {slots.length === 0 && (
-                    <div className="text-center py-8 text-secondary">
-                      <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <p>No time slots added yet. Add at least one to continue.</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex justify-between mt-8">
-                <button
-                  onClick={prevStep}
-                  className="px-6 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-colors font-medium"
-                >
-                  Back
-                </button>
-                <button
                   onClick={handleSubmit}
-                  disabled={slots.length === 0 || submitting}
+                  disabled={slots.length === 0 || submitting || loadingDoctorId || !doctorId}
                   className="btn-primary text-white font-semibold py-3 px-8 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submitting ? (
@@ -425,15 +328,15 @@ export default function CreateTaskPage() {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      Creating Service...
+                      Saving Availability...
                     </div>
                   ) : (
-                    'Create Service'
+                    `Publish ${slots.length} Time Slot${slots.length > 1 ? 's' : ''}`
                   )}
                 </button>
               </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

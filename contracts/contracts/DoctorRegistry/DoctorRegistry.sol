@@ -10,25 +10,38 @@ pragma solidity 0.8.30;
 contract DoctorRegistry is AccessControl, IDoctorRegistry {
     using SafeERC20 for IERC20;
 
+    enum RegStatus {
+        PENDING, // 0
+        APPROVED, // 1
+        DENIED // 2
+    }
+
     mapping(uint32 => Structs.RegStruct) ApprovedRegistry;
-    mapping(uint256 => Structs.RegStruct) PendingRegistry;
-    mapping(address => uint32 docID) RegisteredDoctor;
+    mapping(uint32 => Structs.RegStruct) PendingRegistry;
+    mapping(uint32 => uint8) public isRegisterIDApproved;
+    mapping(address => uint32) public RegisteredDoctor;
+    mapping(address => uint32) public docToRegistrationID;
 
     address public depositToken;
     uint256 public depositFee;
     uint256 public stakeAmount;
     uint256 public totalPYUsdToBeCollected;
-    uint32 public numDoctors;
-    bytes32 public constant APPROVER = keccak256("APPROVER");
 
-    event PendingRegistration(uint32 docID);
+    uint32 public numTotalRegistrations;
+    uint32 public numDoctors;
+
+    bytes32 public constant APPROVER = keccak256("APPROVER");
+    bytes32 public constant EMPTY_STRING_HASH = keccak256(abi.encodePacked(""));
+
+    event PendingRegistration(address docAddress, uint32 numTotalRegistrations);
     event DepositFeeChanged(uint256 oldFee, uint256 newFee);
-    event DoctorRegistered(uint32 docID);
-    event DoctorApproved(uint32 docID);
-    event DoctorDenied(uint32 docID);
+    event DoctorRegistered(address docAddress, uint32 registrationId, uint32 docID);
+    event DoctorApproved(address docAddress, uint32 registrationId, uint32 docID);
+    event DoctorDenied(address pendingDocAddr, uint32 registrationId);
 
     constructor(address _owner, uint256 _depositFee, uint256 _stakeAmount, address _depositToken) {
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
+        _grantRole(APPROVER, _owner);
         stakeAmount = _stakeAmount;
         depositFee = _depositFee;
         depositToken = _depositToken;
@@ -48,12 +61,20 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
         string calldata profileDescription,
         string calldata email,
         uint256 consultationFees,
-        bytes32 legalDocumentsIPFSHash
+        string calldata legalDocumentsIPFSHash
     ) public {
-        require(legalDocumentsIPFSHash != bytes32(0), "Legal documents IPFS hash is required!");
+        require(
+            keccak256(abi.encodePacked(legalDocumentsIPFSHash)) != EMPTY_STRING_HASH,
+            "Legal documents IPFS hash is required!"
+        );
 
-        numDoctors++;
-        PendingRegistry[numDoctors] = Structs.RegStruct({
+        require(docToRegistrationID[msg.sender] == 0, "Doctor already registered or pending approval");
+
+        numTotalRegistrations++;
+
+        PendingRegistry[numTotalRegistrations] = Structs.RegStruct({
+            registrationId: numTotalRegistrations,
+            doctorId: 0,
             Name: name,
             specialization: specialization,
             profileDescription: profileDescription,
@@ -64,33 +85,43 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
             legalDocumentsIPFSHash: legalDocumentsIPFSHash
         });
 
+        docToRegistrationID[msg.sender] = numTotalRegistrations;
+
         totalPYUsdToBeCollected += depositFee;
 
         IERC20(depositToken).transferFrom(msg.sender, address(this), stakeAmount);
-        emit PendingRegistration(numDoctors);
+        emit PendingRegistration(msg.sender, numTotalRegistrations);
     }
 
     /**
      * @notice Approves an doctor and turns him into an ActiveDoctor
-     * @param _docID the doctor that gets approved.
+     * @param _pendingDoctor the doctor that gets approved.
      */
-    function approveDoctor(uint32 _docID) public onlyRole(APPROVER) {
-        Structs.RegStruct memory Docreg = getPendingDoctor(_docID);
-        ApprovedRegistry[_docID] = Docreg;
-        RegisteredDoctor[Docreg.doctorAddress] = _docID;
+    function approveDoctor(address _pendingDoctor) public onlyRole(APPROVER) {
+        (Structs.RegStruct memory Docreg, ) = getPendingDoctor(_pendingDoctor);
+
+        numDoctors++;
+
+        ApprovedRegistry[numDoctors] = Docreg;
+        ApprovedRegistry[numDoctors].doctorId = numDoctors;
+        isRegisterIDApproved[Docreg.registrationId] = uint8(RegStatus.APPROVED);
+
+        RegisteredDoctor[Docreg.doctorAddress] = numDoctors;
         IERC20(depositToken).transfer(Docreg.doctorAddress, stakeAmount - Docreg.depositFeeStored);
-        emit DoctorApproved(numDoctors);
+        emit DoctorApproved(_pendingDoctor, Docreg.registrationId, numDoctors);
     }
 
     /**
      * @notice Approves an doctor and turns him into an ActiveDoctor
-     * @param _docID the doctor that gets approved.
+     * @param _pendingDoctor the doctor that gets approved.
      */
-    function denyDoctor(uint32 _docID) public onlyRole(APPROVER) {
-        Structs.RegStruct memory Docreg = getPendingDoctor(_docID);
+    function denyDoctor(address _pendingDoctor) public onlyRole(APPROVER) {
+        (Structs.RegStruct memory Docreg, ) = getPendingDoctor(_pendingDoctor);
         totalPYUsdToBeCollected += stakeAmount - Docreg.depositFeeStored;
-        delete PendingRegistry[_docID];
-        emit DoctorDenied(_docID);
+
+        isRegisterIDApproved[Docreg.registrationId] = uint8(RegStatus.DENIED);
+
+        emit DoctorDenied(_pendingDoctor, Docreg.registrationId);
     }
 
     /**
@@ -129,9 +160,18 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
 
     /**
      * @notice returns an NON-APPROVED doctor
-     * @param _docID the specific NON-APPROVED doctor you want returned.
+     * @param _pendingDoctor the specific NON-APPROVED doctor you want returned.
      */
-    function getPendingDoctor(uint32 _docID) public view returns (Structs.RegStruct memory DS) {
-        return PendingRegistry[_docID];
+    function getPendingDoctor(address _pendingDoctor) public view returns (Structs.RegStruct memory DS, uint8 status) {
+        uint32 registerId = docToRegistrationID[_pendingDoctor];
+        return (PendingRegistry[registerId], isRegisterIDApproved[registerId]);
+    }
+
+    /**
+     * @notice returns an NON-APPROVED doctor by their registrationID
+     * @param _registrationId the specific NON-APPROVED doctor you want returned.
+     */
+    function getPendingDoctorInfoByID(uint32 _registrationId) public view returns (Structs.RegStruct memory DS, uint8 status) {
+        return (PendingRegistry[_registrationId], isRegisterIDApproved[_registrationId]);
     }
 }

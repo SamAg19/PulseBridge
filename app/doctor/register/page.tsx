@@ -2,24 +2,73 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAccount } from 'wagmi';
+import { useChainId, useConfig, useAccount, useWriteContract } from 'wagmi'
 import Link from 'next/link';
-import { registerDoctorWithWallet, checkDoctorRegistration } from '@/lib/firebase/auth';
-import { DoctorProfile } from '@/lib/types';
+import { readContract, waitForTransactionReceipt } from "@wagmi/core"
+import { formatUnits, parseUnits } from 'viem'
+import { chains, DoctorRegistry, erc20Abi } from "@/lib/constants"
+
 
 export default function DoctorRegisterPage() {
     const { address, isConnected } = useAccount();
+    const chainId = useChainId()
+    const DocRegistry = chains[chainId]["DoctorRegistry"]
+    const PYUSD = chains[chainId]["PYUSD"]
+    const config = useConfig()
+
+
+
+    // PINATA
+    const [file, setFile] = useState<File>();
+    const [uploading, setUploading] = useState(false);
+
     const router = useRouter();
     const [formData, setFormData] = useState({
         fullName: '',
         specialization: '',
-        licenseNumber: '',
         email: '',
+        consultationfee: '',
+        profileDescription: '',
+        licenseNumber: '', // IPFS hash of uploaded document
     });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [fee, setFee] = useState("0");
+    const [stake, setStake] = useState("0");
     const [checkingRegistration, setCheckingRegistration] = useState(true);
-    const [doctorData, setDoctorData] = useState<(DoctorProfile & { id: string; walletAddress: string }) | null>(null);
+    const { writeContractAsync } = useWriteContract()
+
+    const uploadFile = async () => {
+        try {
+            if (!file) {
+                alert("No file selected");
+                return;
+            }
+
+            setUploading(true);
+            const data = new FormData();
+            data.set("file", file);
+            const uploadRequest = await fetch("/api/files", {
+                method: "POST",
+                body: data,
+            });
+            const returnValue = await uploadRequest.json();
+            setFormData({ ...formData, licenseNumber: returnValue[0] });
+            console.log("Uploaded file!: ", returnValue[0])
+            setUploading(false);
+            localStorage.setItem('IPFS', returnValue[1]);
+
+        } catch (e) {
+            console.log(e);
+            setUploading(false);
+            alert("Trouble uploading file");
+        }
+    };
+
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setFile(e.target?.files?.[0]);
+    };
 
     useEffect(() => {
         if (!isConnected) {
@@ -29,41 +78,204 @@ export default function DoctorRegisterPage() {
 
         // Check if doctor is already registered
         const checkRegistration = async () => {
+
             if (address) {
                 try {
-                    const data = await checkDoctorRegistration(address);
-                    if (data) {
-                        setDoctorData(data);
-                        if (data.verificationStatus === 'approved') {
-                            router.push('/dashboard');
-                        } else {
-                            router.push('/doctor/pending');
-                        }
-                        return;
+                    const registerId = await getDoctorRegistrationID();
+                    const status = await getDoctorRegistrationStatus(registerId);
+
+                    if (registerId == 0) {
+                        console.log('Doctor not registered, continuing with registration');
+                    }
+                    else if (status == 0) {
+                        router.push('/doctor/pending');
+                    }
+
+                    else if (status == 1) {
+                        router.push('/dashboard');
+                    }
+
+                    else if (status == 2) {
+                        router.push('/doctor/rejected');
                     }
                 } catch (error) {
-                    // Doctor not registered, continue with registration
-                    console.log('Doctor not registered, continuing with registration');
+                    // Doctor not registered, continue with registration.
+                    console.log('Error in fetching doctor registration:', error);
                 }
             }
+            await getFees();
             setCheckingRegistration(false);
         };
 
         checkRegistration();
     }, [address, isConnected, router]);
 
+    async function getDoctorRegistrationID(): Promise<number> {
+
+        if (!address || !address.startsWith('0x') || address.length !== 42) {
+            throw new Error('Invalid address format')
+        }
+        const id: any = await readContract(config, {
+            abi: DoctorRegistry,
+            address: DocRegistry as `0x${string}`,
+            functionName: 'docToRegistrationID',
+            args: [address as `0x${string}`],
+        })
+
+        console.log("Doctor registration ID: ", id);
+        return id;
+    }
+
+    async function getDoctorRegistrationStatus(registerId: number): Promise<number> {
+
+        const status: any = await readContract(config, {
+            abi: DoctorRegistry,
+            address: DocRegistry as `0x${string}`,
+            functionName: 'isRegisterIDApproved',
+            args: [registerId],
+        })
+
+        console.log("Registration status: ", status);
+
+        return status;
+
+    }
+
+    async function isDoctorApproved(): Promise<Boolean> {
+
+        if (!address || !address.startsWith('0x') || address.length !== 42) {
+            throw new Error('Invalid address format')
+        }
+
+        const doctorId: any = await readContract(config, {
+            abi: DoctorRegistry,
+            address: DocRegistry as `0x${string}`,
+            functionName: 'getDoctorID',
+            args: [address as `0x${string}`],
+        })
+
+        const Doctor: any = await readContract(config, {
+            abi: DoctorRegistry,
+            address: DocRegistry as `0x${string}`,
+            functionName: 'getDoctor',
+            args: [doctorId],
+        })
+
+        return String(Doctor["doctorAddress"]) == address;
+    }
+
+    async function getFees(): Promise<[bigint, bigint]> {
+        const stakeAmountBigInt = await readContract(config, {
+            abi: DoctorRegistry,
+            address: DocRegistry as `0x${string}`,
+            functionName: 'stakeAmount',
+        }) as bigint;
+
+        const depositFeeBigInt = await readContract(config, {
+            abi: DoctorRegistry,
+            address: DocRegistry as `0x${string}`,
+            functionName: 'depositFee',
+        }) as bigint;
+
+        setFee(formatUnits(depositFeeBigInt, 6));
+        setStake(formatUnits(stakeAmountBigInt, 6));
+
+        return [stakeAmountBigInt, depositFeeBigInt];
+    }
+
+    async function getApprovedPYUSD(): Promise<void> {
+        // Get current allowance
+        const currentAllowance = await readContract(config, {
+            abi: erc20Abi,
+            address: PYUSD as `0x${string}`,
+            functionName: 'allowance',
+            args: [address as `0x${string}`, DocRegistry as `0x${string}`]
+        }) as bigint;
+
+        // Get required stake amount
+        const [stakeAmount] = await getFees();
+
+        // Only approve if current allowance is insufficient
+        if (currentAllowance < stakeAmount) {
+            // Note: Some tokens require resetting to 0 before changing approval
+            // PYUSD should not have this issue, but if you encounter problems,
+            // you may need to first approve(0) then approve(stakeAmount)
+
+            const txHash = await writeContractAsync({
+                abi: erc20Abi,
+                address: PYUSD as `0x${string}`,
+                functionName: "approve",
+                args: [DocRegistry as `0x${string}`, stakeAmount],
+                gas: BigInt(100000), // Set explicit gas limit for ERC20 approve
+            });
+
+            // Wait for the approval transaction to be confirmed
+            console.log('Waiting for approval transaction confirmation...');
+            await waitForTransactionReceipt(config, {
+                hash: txHash,
+                confirmations: 1, // Wait for 1 confirmation
+            });
+            console.log('Approval transaction confirmed!');
+        }
+    }
+
+
+
+
+    async function registerAsDoctor() {
+        // 1. Approve PYUSD spending
+        await getApprovedPYUSD();
+
+        // 2. Convert consultation fee to proper format (PYUSD has 6 decimals)
+        const feeInWei = parseUnits(formData.consultationfee, 6);
+
+        // 3. Register on-chain
+        const txHash = await writeContractAsync({
+            abi: DoctorRegistry,
+            address: DocRegistry as `0x${string}`,
+            functionName: "registerAsDoctor",
+            args: [
+                formData.fullName,
+                formData.specialization,
+                formData.profileDescription,
+                formData.email,
+                feeInWei,
+                formData.licenseNumber, // IPFS hash
+            ],
+            gas: BigInt(1000000), // Set explicit gas limit for Sepolia
+        });
+
+        // Wait for the registration transaction to be confirmed
+        console.log('Waiting for registration transaction confirmation...');
+        await waitForTransactionReceipt(config, {
+            hash: txHash,
+            confirmations: 1, // Wait for 1 confirmation
+        });
+        console.log('Registration transaction confirmed!');
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!address) return;
+
+
+
+        // Validate IPFS hash is uploaded
+        if (!formData.licenseNumber) {
+            setError('Please upload your license document first');
+            return;
+        }
 
         setError('');
         setLoading(true);
 
         try {
-            await registerDoctorWithWallet(address, formData);
+            await registerAsDoctor();
+            // Redirect to pending page after successful registration
             router.push('/doctor/pending');
         } catch (err: any) {
-            setError(err.message);
+            setError(err.message || 'Registration failed. Please try again.');
+            console.error('Registration error:', err);
         } finally {
             setLoading(false);
         }
@@ -169,21 +381,158 @@ export default function DoctorRegisterPage() {
                             </div>
 
                             <div>
-                                <label htmlFor="licenseNumber" className="block text-sm font-semibold text-primary mb-2">
-                                    License Number
+                                <label htmlFor="consultationfee" className="block text-sm font-semibold text-primary mb-2">
+                                    Consultation Fee per hour
                                 </label>
                                 <input
-                                    id="licenseNumber"
-                                    type="text"
-                                    value={formData.licenseNumber}
-                                    onChange={(e) => setFormData({ ...formData, licenseNumber: e.target.value })}
+                                    id="consultationfee"
+                                    type="number"
+                                    value={formData.consultationfee}
+                                    onChange={(e) => setFormData({ ...formData, consultationfee: e.target.value })}
                                     className="w-full px-4 py-4 bg-white border border-blue-200 rounded-xl text-gray-900 placeholder-gray-500 input-focus focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    placeholder="MD123456"
+                                    placeholder="$100"
                                     required
                                 />
                             </div>
                         </div>
 
+                        <div className="grid md:grid-cols-1 gap-6">
+                            <div>
+                                <label htmlFor="licenseNumber" className="block text-sm font-semibold text-primary mb-2">
+                                    License Document
+                                </label>
+
+                                {/* File Upload Section */}
+                                <div className="space-y-3">
+                                    {/* File Input with Custom Styling */}
+                                    <div className="relative">
+                                        <input
+                                            type="file"
+                                            id="licenseFile"
+                                            onChange={handleChange}
+                                            required
+                                            accept=".pdf,.jpg,.jpeg,.png"
+                                            className="hidden"
+                                        />
+                                        <label
+                                            htmlFor="licenseFile"
+                                            className="flex items-center justify-center w-full px-4 py-4 bg-white border-2 border-dashed border-blue-300 rounded-xl cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all"
+                                        >
+                                            <svg className="w-6 h-6 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                            </svg>
+                                            <span className="text-gray-600 font-medium">
+                                                {file ? file.name : 'Choose license document'}
+                                            </span>
+                                        </label>
+                                    </div>
+
+                                    {/* Selected File Info */}
+                                    {file && !formData.licenseNumber && (
+                                        <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                            <div className="flex items-center space-x-2">
+                                                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                                <div>
+                                                    <p className="text-sm font-medium text-primary">{file.name}</p>
+                                                    <p className="text-xs text-secondary">{(file.size / 1024).toFixed(2)} KB</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={uploadFile}
+                                                disabled={uploading}
+                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                                            >
+                                                {uploading ? (
+                                                    <>
+                                                        <svg className="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
+                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                        </svg>
+                                                        Uploading...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                                                        </svg>
+                                                        Upload to IPFS
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Upload Success */}
+                                    {formData.licenseNumber && (
+                                        <div className="flex items-start p-4 bg-green-50 rounded-lg border border-green-200">
+                                            <svg className="w-6 h-6 text-green-600 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            <div className="flex-1">
+                                                <p className="text-sm font-semibold text-green-800 mb-1">Document uploaded successfully!</p>
+                                                <p className="text-xs text-green-700 mb-2">IPFS Hash: <span className="font-mono bg-white px-2 py-1 rounded">{formData.licenseNumber}</span></p>
+                                                <a
+                                                    href={String(localStorage.getItem('IPFS'))}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-xs text-blue-600 hover:text-blue-800 underline"
+                                                >
+                                                    View on IPFS →
+                                                </a>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid md:grid-cols-1 gap-5">
+                            <div>
+                                <label htmlFor="specialization" className="block text-sm font-semibold text-primary mb-2">
+                                    Profile Description
+                                </label>
+                                <input
+                                    id="specialization"
+                                    type="text"
+                                    value={formData.profileDescription}
+                                    onChange={(e) => setFormData({ ...formData, profileDescription: e.target.value })}
+                                    className="w-full px-5 py-10 bg-white border border-blue-200 rounded-xl text-gray-900 placeholder-gray-500 input-focus focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Describe yourself to your new clients!"
+                                    required
+                                />
+                            </div>
+
+
+                        </div>
+                        <div className="bg-linear-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
+                            <h3 className="text-lg font-semibold text-primary mb-4 flex items-center">
+                                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Registration Fees
+                            </h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-white rounded-lg p-4 shadow-sm">
+                                    <p className="text-sm text-gray-600 mb-1">Deposit Fee</p>
+                                    <p className="text-2xl font-bold text-blue-600">{fee} PYUSD</p>
+                                    <p className="text-xs text-gray-500 mt-1">Non-refundable</p>
+                                </div>
+                                <div className="bg-white rounded-lg p-4 shadow-sm">
+                                    <p className="text-sm text-gray-600 mb-1">Stake Amount</p>
+                                    <p className="text-2xl font-bold text-blue-600">{stake} PYUSD</p>
+                                    <p className="text-xs text-gray-500 mt-1">Refunded on approval</p>
+                                </div>
+                            </div>
+                            <p className="text-xs text-gray-600 mt-4 flex items-start">
+                                <svg className="w-4 h-4 mr-1 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                </svg>
+                                <b>Total required: {stake} PYUSD. You will get back {Number(stake) - Number(fee)} PYUSD when approved.</b>
+                            </p>
+                        </div>
                         <button
                             type="submit"
                             disabled={loading}
@@ -214,7 +563,7 @@ export default function DoctorRegisterPage() {
                 <div className="text-center mt-6 animate-fadeInUp" style={{ animationDelay: '0.3s' }}>
                     <div className="glass-effect p-4 rounded-xl inline-block">
                         <p className="text-blue-600 text-sm font-medium">
-                            🔒 Your information will be reviewed for verification within 24-48 hours
+                            Your information will be reviewed for verification within 24-48 hours
                         </p>
                     </div>
                 </div>

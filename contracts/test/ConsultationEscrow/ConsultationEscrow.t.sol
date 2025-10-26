@@ -26,8 +26,11 @@ contract ConsultationEscrowTest is Test {
     uint256 depositFee = 1e6;
     uint256 stakeAmount = 5e6;
 
-    string profileDescription = "Experienced mental health therapist specializing in cognitive behavioral therapy and mindfulness techniques.";
+    string profileDescription =
+        "Experienced mental health therapist specializing in cognitive behavioral therapy and mindfulness techniques.";
     string email = "alice@example.com";
+    string validDocIPFSHashStr = "validDocumentsHash";
+    uint256 startTime;
 
     function setUp() public {
         vm.startPrank(admin);
@@ -57,11 +60,13 @@ contract ConsultationEscrowTest is Test {
         PYUSD.faucet(10e6);
 
         PYUSD.approve(address(DocReg), stakeAmount);
-        DocReg.registerAsDoctor("Alice", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, bytes32(uint256(123)));
+        DocReg.registerAsDoctor(
+            "Alice", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, validDocIPFSHashStr
+        );
 
         vm.startPrank(admin);
         DocReg.grantRole(keccak256("APPROVER"), admin);
-        DocReg.approveDoctor(1);
+        DocReg.approveDoctor(doctor);
         _;
     }
 
@@ -71,11 +76,15 @@ contract ConsultationEscrowTest is Test {
         PYUSD.faucet(10e6);
 
         PYUSD.approve(address(DocReg), stakeAmount);
-        DocReg.registerAsDoctor("Alice", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, bytes32(uint256(123)));
+        DocReg.registerAsDoctor(
+            "Alice", "Mental-Health-Therapy", profileDescription, email, consultationFeePerHour, validDocIPFSHashStr
+        );
 
         vm.startPrank(admin);
         DocReg.grantRole(keccak256("APPROVER"), admin);
-        DocReg.approveDoctor(1);
+        DocReg.approveDoctor(doctor);
+
+        startTime = block.timestamp + 1 hours;
 
         /// Create Sessions
 
@@ -94,7 +103,7 @@ contract ConsultationEscrowTest is Test {
         vm.startPrank(alice);
         PYUSD.faucet(consultationFeePerHour);
         PYUSD.approve(address(ConsultEscrow), consultationFeePerHour);
-        ConsultEscrow.createSession(1, consultationFeePerHour, barray, address(PYUSD));
+        ConsultEscrow.createSession(1, consultationFeePerHour, barray, address(PYUSD), startTime);
 
         _;
     }
@@ -103,22 +112,27 @@ contract ConsultationEscrowTest is Test {
         bytes[] memory barray = new bytes[](1);
         vm.startPrank(alice);
 
+        startTime = block.timestamp + 1 hours;
+
         vm.expectRevert("Doctor not found");
-        ConsultEscrow.createSession(2, consultationFeePerHour, barray, address(PYUSD));
+        ConsultEscrow.createSession(2, consultationFeePerHour, barray, address(PYUSD), startTime);
 
         vm.expectRevert("Insufficient contract ETH for oracle fee");
-        ConsultEscrow.createSession(1, consultationFeePerHour, barray, address(PYUSD));
+        ConsultEscrow.createSession(1, consultationFeePerHour, barray, address(PYUSD), startTime);
 
         vm.deal(address(ConsultEscrow), 1 ether);
 
         vm.expectRevert("Invalid payment");
-        ConsultEscrow.createSession(1, consultationFeePerHour, barray, address(0x1));
+        ConsultEscrow.createSession(1, consultationFeePerHour, barray, address(0x1), startTime);
 
         vm.expectRevert("Insufficient payment value");
-        ConsultEscrow.createSession(1, 1e6, barray, address(USDT));
+        ConsultEscrow.createSession(1, 1e6, barray, address(USDT), startTime);
 
         vm.expectRevert("Insufficient pyUSD reserve");
-        ConsultEscrow.createSession(1, consultationFeePerHour, barray, address(USDT));
+        ConsultEscrow.createSession(1, consultationFeePerHour, barray, address(USDT), startTime);
+
+        vm.expectRevert("Invalid start time");
+        ConsultEscrow.createSession(1, consultationFeePerHour, barray, address(USDT), block.timestamp);
 
         vm.startPrank(admin);
         PYUSD.approve(address(ConsultEscrow), consultationFeePerHour);
@@ -126,11 +140,13 @@ contract ConsultationEscrowTest is Test {
 
         vm.startPrank(alice);
         USDT.approve(address(ConsultEscrow), consultationFeePerHour);
-        ConsultEscrow.createSession(1, consultationFeePerHour, barray, address(USDT));
+        ConsultEscrow.createSession(1, consultationFeePerHour, barray, address(USDT), startTime);
     }
 
     function test_createSessionsAllCoins() public doctorCreatedAndApproved {
         vm.deal(address(ConsultEscrow), 1 ether);
+
+        startTime = block.timestamp + 1 hours;
 
         bytes[] memory barray = new bytes[](1);
         uint256 updateFee = Pyth.getUpdateFee(barray);
@@ -144,7 +160,7 @@ contract ConsultationEscrowTest is Test {
         // USDT
         vm.startPrank(alice);
         USDT.approve(address(ConsultEscrow), consultationFeePerHour);
-        ConsultEscrow.createSession(1, consultationFeePerHour, barray, address(USDT));
+        ConsultEscrow.createSession(1, consultationFeePerHour, barray, address(USDT), startTime);
 
         assertEq(USDT.balanceOf(alice), 0);
         assertEq(USDT.balanceOf(address(ConsultEscrow)), consultationFeePerHour);
@@ -158,7 +174,7 @@ contract ConsultationEscrowTest is Test {
 
         vm.startPrank(alice);
         USDC.approve(address(ConsultEscrow), consultationFeePerHour);
-        ConsultEscrow.createSession(1, consultationFeePerHour, barray, address(USDC));
+        ConsultEscrow.createSession(1, consultationFeePerHour, barray, address(USDC), startTime);
 
         assertEq(USDC.balanceOf(alice), 0);
         assertEq(USDC.balanceOf(address(ConsultEscrow)), consultationFeePerHour);
@@ -170,7 +186,7 @@ contract ConsultationEscrowTest is Test {
         vm.startPrank(alice);
         PYUSD.faucet(consultationFeePerHour);
         PYUSD.approve(address(ConsultEscrow), consultationFeePerHour);
-        ConsultEscrow.createSession(1, consultationFeePerHour, barray, address(PYUSD));
+        ConsultEscrow.createSession(1, consultationFeePerHour, barray, address(PYUSD), startTime);
 
         assertEq(PYUSD.balanceOf(alice), 0);
         assertEq(PYUSD.balanceOf(address(ConsultEscrow)), PYUSDBalanceBefore + consultationFeePerHour);
@@ -183,19 +199,19 @@ contract ConsultationEscrowTest is Test {
 
         vm.startPrank(alice);
         uint256 CEbalanceBeforeETH = address(ConsultEscrow).balance;
-        uint32 currentSessionID = ConsultEscrow.numSessions();
+        uint256 currentSessionID = ConsultEscrow.numSessions();
 
         vm.expectEmit(true, true, true, true);
         emit ConsultationEscrow.SessionCreated(
             (currentSessionID + 1), 1, alice, consultationFeePerHour, consultationFeePerHour
         );
         uint256 BS = block.timestamp;
-        ConsultEscrow.createSession{value: 0.02 ether}(1, consultationFeePerHour, barray, address(USDC));
+        ConsultEscrow.createSession{value: 0.02 ether}(1, consultationFeePerHour, barray, address(USDC), startTime);
 
         Structs.Session memory sessionss = ConsultEscrow.getSession(currentSessionID + 1);
 
         Structs.Session memory sessionss1 =
-            Structs.Session(uint8(0), 1, (currentSessionID + 1), alice, bytes32(0), consultationFeePerHour, BS);
+            Structs.Session(uint8(0), 1, (currentSessionID + 1), alice, "", consultationFeePerHour, BS, startTime);
 
         uint256[] memory patientSessions = ConsultEscrow.getPatientSessions(alice);
         uint256[] memory doctorSessions = ConsultEscrow.getDoctorSessions(1);
@@ -209,10 +225,15 @@ contract ConsultationEscrowTest is Test {
     function test_releasePayment() public sessionsCreated {
         uint256 doctorBalanceBefore = PYUSD.balanceOf(doctor);
         uint256 EscrowBalanceBefore = PYUSD.balanceOf(address(ConsultEscrow));
-        uint32 currentSessionID = ConsultEscrow.numSessions();
-        bytes32 ipfsHash = keccak256(abi.encodePacked("PrescriptionIPFSHash"));
+        uint256 currentSessionID = ConsultEscrow.numSessions();
+        string memory ipfsHash = "PrescriptionIPFSHash";
 
         vm.startPrank(doctor);
+        vm.expectRevert("Session not started");
+        ConsultEscrow.releasePayment(currentSessionID, ipfsHash);
+
+        skip(2 hours);
+
         vm.expectEmit(true, true, true, true);
         emit ConsultationEscrow.PaymentReleased(currentSessionID, doctor, consultationFeePerHour);
 
@@ -270,12 +291,14 @@ contract ConsultationEscrowTest is Test {
     function test_RateSessionFromYourDoctor() public sessionsCreated {
         uint256 doctorBalanceBefore = PYUSD.balanceOf(doctor);
         uint256 EscrowBalanceBefore = PYUSD.balanceOf(address(ConsultEscrow));
-        uint32 currentSessionID = ConsultEscrow.numSessions();
-        bytes32 ipfsHash = keccak256(abi.encodePacked("PrescriptionIPFSHash"));
+        uint256 currentSessionID = ConsultEscrow.numSessions();
+        string memory ipfsHash = "PrescriptionIPFSHash";
 
         vm.startPrank(alice);
         vm.expectRevert("Session not Completed");
         ConsultEscrow.rateSession(currentSessionID, 100);
+
+        skip(2 hours);
 
         vm.startPrank(doctor);
         ConsultEscrow.releasePayment(currentSessionID, ipfsHash);

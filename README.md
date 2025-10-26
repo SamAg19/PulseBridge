@@ -127,5 +127,3 @@ Live demo:
 * Implementing comprehensive privacy safeguards is essential to ensure user data protection and maintain compliance with applicable legal regulations.
 
 * * *
-
-_._

@@ -31,14 +31,14 @@ export default function Navigation({ userType }: NavigationProps) {
         return [
           { href: '/patient', label: 'Find Doctors', icon: Search },
           { href: '/patient/appointments', label: 'My Appointments', icon: Calendar },
-          { href: '/patient/payments', label: 'Payment History', icon: CreditCard },
+          { href: '/patient/payment-history', label: 'Payment History', icon: CreditCard },
         ];
       case 'doctor':
         return [
           { href: '/dashboard', label: 'Dashboard', icon: Settings },
           { href: '/dashboard/tasks', label: 'My Services', icon: Stethoscope },
           { href: '/dashboard/appointments', label: 'Appointments', icon: Calendar },
-          { href: '/dashboard/payments', label: 'Payments', icon: CreditCard },
+          { href: '/dashboard/payment-history', label: 'Payment History', icon: CreditCard },
         ];
       case 'admin':
         return [

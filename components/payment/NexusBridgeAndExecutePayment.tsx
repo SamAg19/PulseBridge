@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { sdk, initializeWithProvider } from '@/app/lib/nexus';
+import { sdk, initializeWithProvider, getUnifiedBalances } from '@/app/lib/nexus';
 import { useAccount, useChainId } from 'wagmi';
 import { chains } from '@/lib/constants';
-import { parseUnits } from 'viem';
+import { parseUnits, formatUnits } from 'viem';
 import { Button } from '@/components/ui/button';
-import { Loader2, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Loader2, ArrowRight, CheckCircle2, AlertCircle, Wallet } from 'lucide-react';
 
 interface NexusBridgeAndExecutePaymentProps {
   doctorId: number;
@@ -19,6 +19,12 @@ interface NexusBridgeAndExecutePaymentProps {
 }
 
 type PaymentStatus = 'idle' | 'bridging' | 'executing' | 'success' | 'error';
+
+interface ChainBalance {
+  chainId: number;
+  chainName: string;
+  balance: string;
+}
 
 export default function NexusBridgeAndExecutePayment({
   doctorId,
@@ -34,8 +40,87 @@ export default function NexusBridgeAndExecutePayment({
   const [status, setStatus] = useState<PaymentStatus>('idle');
   const [txHash, setTxHash] = useState<string>('');
   const [error, setError] = useState<string>('');
+  const [showBalances, setShowBalances] = useState(false);
+  const [isLoadingBalances, setIsLoadingBalances] = useState(false);
+  const [balances, setBalances] = useState<ChainBalance[]>([]);
 
   const escrowAddress = chains[chainId]?.['ConsultationEscrow'];
+
+  // Testnet chain IDs to names
+  const chainIdToName: Record<number, string> = {
+    11155420: 'Optimism Sepolia',
+    80002: 'Polygon Amoy',
+    421614: 'Arbitrum Sepolia',
+    534351: 'Scroll Sepolia',
+    84532: 'Base Sepolia',
+    11155111: 'Ethereum Sepolia',
+  };
+
+  const handleFetchBalances = async () => {
+    setIsLoadingBalances(true);
+    setError('');
+
+    try {
+      // Initialize SDK if not already initialized
+      if (!sdk.isInitialized()) {
+        if (typeof window !== 'undefined' && window.ethereum) {
+          await initializeWithProvider(window.ethereum);
+        } else {
+          setError('No wallet provider found. Please install MetaMask or another Web3 wallet.');
+          setIsLoadingBalances(false);
+          return;
+        }
+      }
+
+      console.log('Fetching unified balances for token:', selectedToken);
+      const unifiedBalances = await getUnifiedBalances();
+      console.log('Raw Unified Balances Response:', JSON.stringify(unifiedBalances, null, 2));
+
+      // Find the selected token's balances across chains
+      const tokenBalances: ChainBalance[] = [];
+
+      // The response is an array of token objects
+      if (Array.isArray(unifiedBalances)) {
+        console.log('Processing balances array...');
+
+        // Find the token we're looking for
+        const tokenData = unifiedBalances.find((token: any) => token.symbol === selectedToken);
+        console.log(`Found ${selectedToken} data:`, tokenData);
+
+        if (tokenData && tokenData.breakdown && Array.isArray(tokenData.breakdown)) {
+          console.log(`Processing ${tokenData.breakdown.length} chains for ${selectedToken}`);
+
+          tokenData.breakdown.forEach((chainData: any) => {
+            const chainId = chainData.chain?.id;
+            const balance = chainData.balance;
+            const decimals = chainData.decimals || (selectedToken === 'ETH' ? 18 : 6);
+
+            console.log(`Chain ${chainId}: balance=${balance}, decimals=${decimals}`);
+
+            // Add all chains, even with zero balance
+            tokenBalances.push({
+              chainId: chainId,
+              chainName: chainData.chain?.name || chainIdToName[chainId] || `Chain ${chainId}`,
+              balance: parseFloat(balance || 0).toFixed(6),
+            });
+          });
+        } else {
+          console.warn(`No ${selectedToken} token found in response`);
+        }
+      } else {
+        console.warn('Response is not an array:', unifiedBalances);
+      }
+
+      console.log('Final token balances:', tokenBalances);
+      setBalances(tokenBalances);
+      setShowBalances(true);
+    } catch (err: any) {
+      console.error('Failed to fetch unified balances:', err);
+      setError(`Failed to fetch balances: ${err.message}`);
+    } finally {
+      setIsLoadingBalances(false);
+    }
+  };
 
   const handleBridgeAndExecute = async () => {
     // Initialize SDK if not already initialized
@@ -89,11 +174,11 @@ export default function NexusBridgeAndExecutePayment({
           buildFunctionParams: (token: any, amount: string | number | bigint | boolean, chainId: any, userAddress: any) => {
             return {
               functionParams: [
-                doctorId, // uint32 doctorId
-                BigInt(amount), // uint256 consultationPayment
-                [priceUpdateData], // bytes[] priceUpdateData
-                tokenAddress as `0x${string}`, // address tokenAddress
-                BigInt(startTime), // uint256 startTime
+                doctorId,
+                BigInt(amount),
+                [priceUpdateData],
+                tokenAddress as `0x${string}`,
+                BigInt(startTime),
               ],
             };
           },
@@ -243,30 +328,83 @@ export default function NexusBridgeAndExecutePayment({
           </div>
         )}
 
-        {/* Action Button */}
-        <Button
-          onClick={handleBridgeAndExecute}
-          disabled={status === 'bridging' || status === 'executing' || status === 'success'}
-          className="w-full h-12 text-lg font-semibold"
-          size="lg"
-        >
-          {status === 'bridging' || status === 'executing' ? (
-            <>
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Processing...
-            </>
-          ) : status === 'success' ? (
-            <>
-              <CheckCircle2 className="mr-2 h-5 w-5" />
-              Payment Complete
-            </>
-          ) : (
-            <>
-              <ArrowRight className="mr-2 h-5 w-5" />
-              Bridge & Pay {consultationFee.toFixed(2)} {selectedToken}
-            </>
-          )}
-        </Button>
+        {/* Unified Balances Display */}
+        {showBalances && (
+          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-4">
+            <h4 className="font-semibold text-indigo-900 mb-3 flex items-center gap-2">
+              <Wallet className="h-5 w-5" />
+              Your {selectedToken} Balances Across Chains
+            </h4>
+            {balances.length > 0 ? (
+              <div className="space-y-2">
+                {balances.map((chainBalance) => (
+                  <div
+                    key={chainBalance.chainId}
+                    className="flex justify-between items-center bg-white rounded-md px-3 py-2"
+                  >
+                    <span className="text-sm font-medium text-gray-700">
+                      {chainBalance.chainName}
+                    </span>
+                    <span className="text-sm font-bold text-indigo-600">
+                      {chainBalance.balance} {selectedToken}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-600 text-center py-2">
+                No {selectedToken} balances found across supported chains
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex gap-3">
+          <Button
+            onClick={handleFetchBalances}
+            disabled={isLoadingBalances || status === 'bridging' || status === 'executing' || status === 'success'}
+            variant="outline"
+            className="flex-1 h-12 text-base font-semibold border-2"
+            size="lg"
+          >
+            {isLoadingBalances ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              <>
+                <Wallet className="mr-2 h-4 w-4" />
+                View Balances
+              </>
+            )}
+          </Button>
+
+          <Button
+            onClick={handleBridgeAndExecute}
+            disabled={status === 'bridging' || status === 'executing' || status === 'success'}
+            className="flex-[2] h-12 text-base font-semibold"
+            size="lg"
+          >
+            {status === 'bridging' || status === 'executing' ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Processing...
+              </>
+            ) : status === 'success' ? (
+              <>
+                <CheckCircle2 className="mr-2 h-5 w-5" />
+                Payment Complete
+              </>
+            ) : (
+              <>
+                <ArrowRight className="mr-2 h-5 w-5" />
+                Bridge & Pay {consultationFee.toFixed(2)} {selectedToken}
+              </>
+            )}
+          </Button>
+        </div>
 
         {/* Security Note */}
         <p className="text-xs text-center text-gray-500">

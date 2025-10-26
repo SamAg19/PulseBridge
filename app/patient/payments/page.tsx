@@ -185,7 +185,6 @@ export default function PatientPayments() {
   // Handle price updates from Pyth
   const handlePricesUpdate = (prices: PriceData[], priceData: any) => {
     setTokenPrices(prices);
-    console.log('Received price updates:', priceData);
     setPriceUpdates(priceData);
   };
 
@@ -388,7 +387,8 @@ export default function PatientPayments() {
                   <ul className="text-xs text-gray-600 space-y-1 ml-13">
                     <li>• Bridge and Execute from any chain</li>
                     <li>• One-click payment</li>
-                    <li>• Supports USDC, USDT</li>
+                    <li>• Supports USDC, USDT for Bridge and Execute</li>
+                    <li>• ETH Supports only Bridging. Requires additional transaction for execution</li>
                   </ul>
                 </div>
               </div>
@@ -404,33 +404,57 @@ export default function PatientPayments() {
                 </div>
               )}
 
-              {paymentMethod === 'nexus' && selectedToken !== 'PYUSD' && selectedToken !== 'ETH' ? (
-                <NexusBridgeAndExecutePayment
-                  doctorId={bookingDetails.doctorId}
-                  consultationFee={convertedAmount > 0 ? convertedAmount : bookingDetails.fee}
-                  selectedToken={selectedToken as 'USDC' | 'USDT'}
-                  priceUpdateData={priceUpdates ? `0x${priceUpdates.binary.data[0]}` : '0x'}
-                  startTime={Math.floor(new Date(`${bookingDetails.slotDate}T${bookingDetails.slotStartTime}`).getTime() / 1000)}
-                  onSuccess={() => {
-                    alert('Session created successfully! Redirecting to your appointments...');
-                    router.push('/patient/appointments');
-                  }}
-                  onError={(err) => {
-                    setError(`Nexus payment failed: ${err.message}`);
-                  }}
-                />
-              ) : paymentMethod === 'nexus' && selectedToken === 'PYUSD' ? (
+              {paymentMethod === 'nexus' && selectedToken === 'PYUSD' ? (
                 <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
                   <p className="text-sm text-yellow-800">
-                    ⚠️ Nexus Bridge payment is not available for PYUSD. Please select ETH or another stablecoin (USDC or USDT) or use Standard Payment method.
+                    ⚠️ Nexus Bridge payment is not available for PYUSD. Please select ETH, USDC, or USDT, or use Standard Payment method.
                   </p>
                 </div>
               ) : paymentMethod === 'nexus' && selectedToken === 'ETH' ? (
-                <NexusBridgePayment
-                  chainId={chainId}
-                  selectedToken={selectedToken}
-                  convertedAmount={convertedAmount}
-                />
+                <div className="space-y-4">
+                  {/* ETH Bridge Only - No Execute */}
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                    <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                      <span>ℹ️</span>
+                      ETH Bridge Only
+                    </h3>
+                    <p className="text-sm text-blue-800">
+                      ETH bridging via Nexus requires two steps: First bridge your ETH to Sepolia, then manually complete the payment using the standard payment method.
+                    </p>
+                  </div>
+                  <NexusBridgePayment
+                    chainId={chainId}
+                    selectedToken={selectedToken}
+                    convertedAmount={convertedAmount}
+                  />
+                </div>
+              ) : paymentMethod === 'nexus' && (selectedToken === 'USDC' || selectedToken === 'USDT') ? (
+                <div className="space-y-4">
+                  {/* USDC/USDT Bridge and Execute */}
+                  <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl">
+                    <h3 className="font-semibold text-purple-900 mb-2 flex items-center gap-2">
+                      <span>🚀</span>
+                      Bridge and Execute (One Transaction)
+                    </h3>
+                    <p className="text-sm text-purple-800">
+                      {selectedToken} supports automatic execution! Your tokens will be bridged to Sepolia and the consultation session will be created automatically in one seamless transaction.
+                    </p>
+                  </div>
+                  <NexusBridgeAndExecutePayment
+                    doctorId={bookingDetails.doctorId}
+                    consultationFee={convertedAmount > 0 ? convertedAmount : bookingDetails.fee}
+                    selectedToken={selectedToken as 'USDC' | 'USDT'}
+                    priceUpdateData={priceUpdates ? `0x${priceUpdates.binary.data[0]}` : '0x'}
+                    startTime={Math.floor(new Date(`${bookingDetails.slotDate}T${bookingDetails.slotStartTime}`).getTime() / 1000)}
+                    onSuccess={() => {
+                      alert('Session created successfully! Redirecting to your appointments...');
+                      router.push('/patient/appointments');
+                    }}
+                    onError={(err) => {
+                      setError(`Nexus payment failed: ${err.message}`);
+                    }}
+                  />
+                </div>
               ) : null}
 
               {paymentMethod === 'standard' && (
@@ -526,7 +550,7 @@ export default function PatientPayments() {
 
                 {selectedToken !== 'PYUSD' && convertedAmount > 0 && (
                   <div className="p-4 bg-purple-50 rounded-lg">
-                    <p className="text-sm text-secondary mb-1">Converted Amount</p>
+                    <p className="text-sm text-secondary mb-1">Converted Amount + 1% of Converted Amount</p>
                     <p className="text-2xl font-bold text-purple-600">
                       {convertedAmount.toFixed(6)} {selectedToken}
                     </p>

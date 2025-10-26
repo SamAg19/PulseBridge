@@ -15,8 +15,8 @@ export const SEPOLIA_CONFIG: NetworkConfig = {
   // USDT on Sepolia - Aave Faucet USDT
   usdt: "0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0",
 
-  // USDC on Sepolia - Aave Faucet USDC
-  usdc: "0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8",
+  // USDC on Sepolia
+  usdc: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
 
   // PYUSD on Sepolia - PayPal USD
   pyusd: "0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9",

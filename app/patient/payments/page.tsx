@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAccount, useChainId, useConfig } from 'wagmi';
 import { waitForTransactionReceipt } from '@wagmi/core';
@@ -15,7 +15,7 @@ import NexusBridgePayment from '@/components/payment/NexusBridgePayment';
 type TokenType = 'PYUSD' | 'ETH' | 'USDC' | 'USDT';
 type PaymentMethod = 'standard' | 'nexus';
 
-export default function PatientPayments() {
+function PatientPaymentsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { address, isConnected } = useAccount();
@@ -368,7 +368,7 @@ export default function PatientPayments() {
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center">
-                      <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full flex items-center justify-center mr-3">
+                      <div className="w-10 h-10 bg-linear-to-r from-purple-600 to-indigo-600 rounded-full flex items-center justify-center mr-3">
                         <span className="text-white text-lg">🌉</span>
                       </div>
                       <div>
@@ -503,7 +503,7 @@ export default function PatientPayments() {
                   <button
                     onClick={handleCreateSession}
                     disabled={processing || isCreatingSession}
-                    className="w-full px-6 py-4 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all font-semibold text-lg shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-6 py-4 bg-linear-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all font-semibold text-lg shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isCreatingSession || processing ? (
                       <div className="flex items-center justify-center">
@@ -573,5 +573,17 @@ export default function PatientPayments() {
         <PythPriceFeeds onPricesUpdate={handlePricesUpdate} />
       </div>
     </div>
+  );
+}
+
+export default function PatientPayments() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-light-blue flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    }>
+      <PatientPaymentsContent />
+    </Suspense>
   );
 }

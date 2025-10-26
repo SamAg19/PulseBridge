@@ -48,7 +48,7 @@ export async function getAllDoctors(chainId: number): Promise<DoctorProfile[]> {
       .map((result, index) => {
         if (result.status === 'success' && result.result) {
           const data = result.result as any;
-          return {
+          const doctor: DoctorProfile = {
             registrationId: Number(data.registrationId),
             doctorId: doctorIds[index],
             name: data.Name,
@@ -58,8 +58,9 @@ export async function getAllDoctors(chainId: number): Promise<DoctorProfile[]> {
             walletAddress: data.doctorAddress,
             consultationFeePerHour: Number(formatUnits(data.consultationFeePerHour, 6)),
             legalDocumentsIPFSHash: data.legalDocumentsIPFSHash,
-            verificationStatus: 'approved' as const, // All fetched doctors are approved
+            verificationStatus: 'approved', // All fetched doctors are approved
           };
+          return doctor;
         }
         return null;
       })
@@ -249,16 +250,19 @@ export async function getPatientSessionsWithDetails(
       .map((result) => {
         if (result.status === 'success' && result.result) {
           const data = result.result as any;
-          return {
+          const session: Session = {
             sessionId: Number(data.sessionId),
             doctorId: Number(data.doctorId),
             patient: data.patient,
             pyusdAmount: Number(formatUnits(data.pyusdAmount, 6)),
             status: statusMap[data.status] || 'active',
-            prescriptionIPFSHash: data.doctorPrescriptionIPFSHash || undefined,
             createdAt: Number(data.createdAt),
             startTime: Number(data.startTime),
           };
+          if (data.doctorPrescriptionIPFSHash) {
+            session.prescriptionIPFSHash = data.doctorPrescriptionIPFSHash;
+          }
+          return session;
         }
         return null;
       })
@@ -313,16 +317,19 @@ export async function getDoctorSessionsWithDetails(
       .map((result) => {
         if (result.status === 'success' && result.result) {
           const data = result.result as any;
-          return {
+          const session: Session = {
             sessionId: Number(data.sessionId),
             doctorId: Number(data.doctorId),
             patient: data.patient,
             pyusdAmount: Number(formatUnits(data.pyusdAmount, 6)),
             status: statusMap[data.status] || 'active',
-            prescriptionIPFSHash: data.doctorPrescriptionIPFSHash || undefined,
             createdAt: Number(data.createdAt),
             startTime: Number(data.startTime),
           };
+          if (data.doctorPrescriptionIPFSHash) {
+            session.prescriptionIPFSHash = data.doctorPrescriptionIPFSHash;
+          }
+          return session;
         }
         return null;
       })

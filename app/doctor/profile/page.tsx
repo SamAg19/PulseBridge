@@ -13,8 +13,8 @@ export default function DoctorProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [profile, setProfile] = useState<DoctorProfile | null>(null);
-  const [editedProfile, setEditedProfile] = useState<Partial<DoctorProfile>>({});
+  const [profile, setProfile] = useState<any>(null);
+  const [editedProfile, setEditedProfile] = useState<any>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -41,13 +41,13 @@ export default function DoctorProfilePage() {
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!editedProfile.fullName?.trim()) {
+    if (!editedProfile?.fullName?.trim()) {
       newErrors.fullName = 'Full name is required';
     }
 
-    if (!editedProfile.email?.trim()) {
+    if (!editedProfile?.email?.trim()) {
       newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editedProfile.email)) {
+    } else if (editedProfile.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editedProfile.email)) {
       newErrors.email = 'Please enter a valid email address';
     }
 
@@ -73,7 +73,7 @@ export default function DoctorProfilePage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setEditedProfile(prev => ({ ...prev, [name]: value }));
+    setEditedProfile((prev: any) => ({ ...prev, [name]: value }));
     
     // Clear error when user starts typing
     if (errors[name]) {

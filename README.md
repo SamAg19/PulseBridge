@@ -1,10 +1,5 @@
 # PulseBridge
 
-## Verifiable and Non-Tamperable Online Healthcare Platform
-
-
-## Platform Overview
-
 PulseBridge enables doctors and patients to connect for medical consultations anywhere in the world, removing geographic and financial barriers to healthcare. The platform provides a secure, and transparent for medical consultations across various specializations including Cardiology, Mental Health, and more.
 
 ## Summary

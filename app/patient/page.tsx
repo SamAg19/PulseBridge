@@ -15,6 +15,7 @@ import { getAllDoctors } from "@/lib/contracts/utils"
 import { formatUnits } from 'viem';
 import { useChainId } from 'wagmi'
 import { getDoctorAvailabilityById, getAvailableSlots } from '@/lib/firebase/availability';
+import HealthChatbot from '@/components/HealthChatbot';
 
 export default function PatientDashboard() {
   const { address, isConnected } = useAccount();
@@ -515,6 +516,9 @@ export default function PatientDashboard() {
           </div>
         </div>
       )}
+
+      {/* Health Chatbot */}
+      <HealthChatbot />
     </ResponsiveLayout>
   );
 }

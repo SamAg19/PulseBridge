@@ -78,6 +78,8 @@ class Web3DoctorClient:
                 "outputs": [
                     {
                         "components": [
+                            {"name": "registrationId", "type": "uint32"},
+                            {"name": "doctorId", "type": "uint32"},
                             {"name": "Name", "type": "string"},
                             {"name": "specialization", "type": "string"},
                             {"name": "profileDescription", "type": "string"},
@@ -85,7 +87,7 @@ class Web3DoctorClient:
                             {"name": "doctorAddress", "type": "address"},
                             {"name": "consultationFeePerHour", "type": "uint256"},
                             {"name": "depositFeeStored", "type": "uint256"},
-                            {"name": "legalDocumentsIPFSHash", "type": "bytes32"}
+                            {"name": "legalDocumentsIPFSHash", "type": "string"}
                         ],
                         "type": "tuple"
                     }
@@ -123,15 +125,16 @@ class Web3DoctorClient:
             doctor_data = self.contract.functions.getDoctor(doctor_id).call()
 
             return {
-                "doctor_id": doctor_id,
-                "name": doctor_data[0],
-                "specialization": doctor_data[1],
-                "profile_description": doctor_data[2],
-                "email": doctor_data[3],
-                "address": doctor_data[4],
-                "consultation_fee_per_hour": doctor_data[5],
-                "deposit_fee_stored": doctor_data[6],
-                "ipfs_hash": doctor_data[7].hex() if doctor_data[7] else None
+                "registration_id": doctor_data[0],
+                "doctor_id": doctor_data[1],
+                "name": doctor_data[2],
+                "specialization": doctor_data[3],
+                "profile_description": doctor_data[4],
+                "email": doctor_data[5],
+                "address": doctor_data[6],
+                "consultation_fee_per_hour": doctor_data[7],
+                "deposit_fee_stored": doctor_data[8],
+                "ipfs_hash": doctor_data[9]
             }
         except Exception as e:
             logger.error(f"Failed to get doctor {doctor_id}: {e}")

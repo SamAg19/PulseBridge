@@ -16,8 +16,8 @@ export default function DoctorProfileModal({ isOpen, onClose }: DoctorProfileMod
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [profile, setProfile] = useState<DoctorProfile | null>(null);
-  const [editedProfile, setEditedProfile] = useState<Partial<DoctorProfile>>({});
+  const [profile, setProfile] = useState<any>(null);
+  const [editedProfile, setEditedProfile] = useState<any>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -78,7 +78,7 @@ export default function DoctorProfileModal({ isOpen, onClose }: DoctorProfileMod
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setEditedProfile(prev => ({ ...prev, [name]: value }));
+    setEditedProfile((prev: any) => ({ ...prev, [name]: value }));
     
     // Clear error when user starts typing
     if (errors[name]) {

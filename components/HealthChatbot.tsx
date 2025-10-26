@@ -10,6 +10,13 @@ interface Message {
   text: string;
   sender: 'user' | 'bot';
   timestamp: Date;
+  metadata?: {
+    specialty?: string;
+    confidence?: number;
+    urgency_level?: string;
+    doctors_found?: number;
+    type?: string;
+  };
 }
 
 export default function HealthChatbot() {
@@ -63,14 +70,22 @@ export default function HealthChatbot() {
         id: (Date.now() + 1).toString(),
         text: data.response || 'I apologize, but I couldn\'t process that request.',
         sender: 'bot',
-        timestamp: new Date()
+        timestamp: new Date(),
+        metadata: data.metadata // Include metadata from agent (specialty, urgency, etc.)
       };
 
       setMessages(prev => [...prev, botMessage]);
+
+      // Log metadata for debugging
+      if (data.metadata) {
+        console.log('[HealthChatbot] Received metadata:', data.metadata);
+      }
     } catch (error) {
+      console.error('[HealthChatbot] Error:', error);
+
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: 'Sorry, I\'m having trouble connecting. Please try again later.',
+        text: 'Sorry, I\'m having trouble connecting to the health assistant. Please ensure the coordinator agent is running on port 8001.',
         sender: 'bot',
         timestamp: new Date()
       };

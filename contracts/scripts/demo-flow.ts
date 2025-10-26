@@ -44,12 +44,14 @@ console.log("-----------------------------------\n");
 
 // Connect to network
 const { viem } = await network.connect();
-const [deployer, doctor, patient] = await viem.getWalletClients();
+const [deployer, cardiologist, neurologist, dermatologist, patient] = await viem.getWalletClients();
 const publicClient = await viem.getPublicClient();
 
 console.log("Accounts:");
 console.log("  Deployer:", deployer.account.address);
-console.log("  Doctor:", doctor.account.address);
+console.log("  Cardiologist:", cardiologist.account.address);
+console.log("  Neurologist:", neurologist.account.address);
+console.log("  Dermatologist:", dermatologist.account.address);
 console.log("  Patient:", patient.account.address);
 console.log("-----------------------------------\n");
 
@@ -83,11 +85,25 @@ if (deploymentInfo.useMocks) {
   console.log("-----------------------------------");
   console.log("Note: Faucet limit is 10,000 PYUSD per call\n");
 
-  // Mint PYUSD for doctor (for registration stake)
-  const doctorMintAmount = parseUnits("10000", 6); // 10,000 PYUSD (max per faucet call)
-  console.log(`Minting ${formatUnits(doctorMintAmount, 6)} PYUSD for doctor...`);
-  await pyusdContract.write.faucet([doctorMintAmount], {
-    account: doctor.account,
+  // Mint PYUSD for cardiologist (for registration stake)
+  const cardiologistMintAmount = parseUnits("10000", 6); // 10,000 PYUSD (max per faucet call)
+  console.log(`Minting ${formatUnits(cardiologistMintAmount, 6)} PYUSD for cardiologist...`);
+  await pyusdContract.write.faucet([cardiologistMintAmount], {
+    account: cardiologist.account,
+  });
+
+  // Mint PYUSD for neurologist (for registration stake)
+  const neurologistMintAmount = parseUnits("10000", 6);
+  console.log(`Minting ${formatUnits(neurologistMintAmount, 6)} PYUSD for neurologist...`);
+  await pyusdContract.write.faucet([neurologistMintAmount], {
+    account: neurologist.account,
+  });
+  
+  // Mint PYUSD for dermatologist (for registration stake)
+  const dermatologistMintAmount = parseUnits("10000", 6);
+  console.log(`Minting ${formatUnits(dermatologistMintAmount, 6)} PYUSD for dermatologist...`);
+  await pyusdContract.write.faucet([dermatologistMintAmount], {
+    account: dermatologist.account,
   });
 
   // Mint PYUSD for patient (for consultation payment)
@@ -115,18 +131,24 @@ if (deploymentInfo.useMocks) {
   console.log("STEP 1: Using Real PYUSD Tokens");
   console.log("-----------------------------------");
   console.log("⚠️  Ensure accounts have sufficient PYUSD balance");
-  console.log("   Doctor needs: 1000 PYUSD for stake");
+  console.log("   Cardiologist needs: 1000 PYUSD for stake");
+  console.log("   Neurologist needs: 1000 PYUSD for stake");
+  console.log("   Dermatologist needs: 1000 PYUSD for stake");
   console.log("   Patient needs: ~100 PYUSD for consultation");
   console.log("   Deployer needs: PYUSD for escrow reserve\n");
 }
 
 // Check balances
-const doctorBalance = await pyusdContract.read.balanceOf([doctor.account.address]);
+const cardiologistBalance = await pyusdContract.read.balanceOf([cardiologist.account.address]);
+const neurologistBalance = await pyusdContract.read.balanceOf([neurologist.account.address]);
+const dermatologistBalance = await pyusdContract.read.balanceOf([dermatologist.account.address]);
 const patientBalance = await pyusdContract.read.balanceOf([patient.account.address]);
 const deployerBalance = await pyusdContract.read.balanceOf([deployer.account.address]);
 
 console.log("Current PYUSD Balances:");
-console.log(`  Doctor: ${formatUnits(doctorBalance as bigint, 6)} PYUSD`);
+console.log(`  Cardiologist: ${formatUnits(cardiologistBalance as bigint, 6)} PYUSD`);
+console.log(`  Neurologist: ${formatUnits(neurologistBalance as bigint, 6)} PYUSD`);
+console.log(`  Dermatologist: ${formatUnits(dermatologistBalance as bigint, 6)} PYUSD`);
 console.log(`  Patient: ${formatUnits(patientBalance as bigint, 6)} PYUSD`);
 console.log(`  Deployer: ${formatUnits(deployerBalance as bigint, 6)} PYUSD`);
 console.log("-----------------------------------\n");
@@ -143,51 +165,96 @@ const depositFee = BigInt(deploymentInfo.parameters.doctorDepositFee);
 console.log(`Stake Amount Required: ${formatUnits(stakeAmount, 6)} PYUSD`);
 console.log(`Deposit Fee: ${formatUnits(depositFee, 6)} PYUSD`);
 
-// Approve DoctorRegistry to spend PYUSD for stake
-console.log("\nApproving DoctorRegistry to spend PYUSD...");
+// Approve DoctorRegistry to spend PYUSD for stake (for 3 doctors)
+const totalStakeForDoctors = stakeAmount * 3n;
+console.log(`\nApproving DoctorRegistry to spend ${formatUnits(totalStakeForDoctors, 6)} PYUSD for 3 doctors...`);
 await pyusdContract.write.approve(
-  [doctorRegistryContract.address, stakeAmount],
-  { account: doctor.account }
+  [doctorRegistryContract.address, totalStakeForDoctors],
+  { account: cardiologist.account }
 );
 console.log("✓ Approval granted");
 
-// Register as doctor
-const doctorName = "Dr. Sarah Johnson";
-const specialization = "Cardiologist";
-const profileDescription = "Experienced cardiologist specializing in heart health and preventive care.";
-const email = "sarah.johnson@example.com";
-const consultationFeePerHour = parseUnits("50", 6); // $50 per hour
-const legalDocumentsIPFSHash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+// Doctor 1: Cardiologist
+console.log("\n--- Registering Doctor 1: Cardiologist ---");
+const doctor1Name = "Sarah Johnson";
+const doctor1Specialization = "Cardiologist";
+const doctor1Description = "Experienced cardiologist specializing in heart health and preventive care.";
+const doctor1Email = "sarah.johnson@example.com";
+const doctor1FeePerHour = parseUnits("50", 6); // $50 per hour
+const doctor1IPFSHash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
 
-console.log("\nRegistering doctor with details:");
-console.log(`  Name: ${doctorName}`);
-console.log(`  Specialization: ${specialization}`);
-console.log(`  Profile Description: ${profileDescription}`);
-console.log(`  Email: ${email}`);
-console.log(`  Consultation Fee: ${formatUnits(consultationFeePerHour, 6)} PYUSD/hour`);
-console.log(`  Legal Documents IPFS: ${legalDocumentsIPFSHash}`);
+console.log(`  Name: ${doctor1Name}`);
+console.log(`  Specialization: ${doctor1Specialization}`);
+console.log(`  Consultation Fee: ${formatUnits(doctor1FeePerHour, 6)} PYUSD/hour`);
 
-const registerTxHash = await doctorRegistryContract.write.registerAsDoctor(
-  [doctorName, specialization, profileDescription, email, consultationFeePerHour, legalDocumentsIPFSHash],
-  { account: doctor.account }
+const registerTx1Hash = await doctorRegistryContract.write.registerAsDoctor(
+  [doctor1Name, doctor1Specialization, doctor1Description, doctor1Email, doctor1FeePerHour, doctor1IPFSHash],
+  { account: cardiologist.account }
 );
 
-await publicClient.waitForTransactionReceipt({ hash: registerTxHash });
-console.log("✓ Doctor registered successfully");
-console.log(`  Transaction: ${registerTxHash}`);
+await publicClient.waitForTransactionReceipt({ hash: registerTx1Hash });
+console.log("✓ Cardiologist registered successfully");
+console.log(`  Transaction: ${registerTx1Hash}`);
 
-// Get doctor ID (should be 1 for first doctor)
-const registerId = await doctorRegistryContract.read.docToRegistrationID([doctor.account.address]);
-const pendingDoctor: any = await doctorRegistryContract.read.getPendingDoctorInfoByID([registerId]);
+// Doctor 2: Dermatologist
+console.log("\n--- Registering Doctor 2: Dermatologist ---");
+const doctor2Name = "Emily Chen";
+const doctor2Specialization = "Dermatologist";
+const doctor2Description = "Board-certified dermatologist specializing in skin conditions and cosmetic dermatology.";
+const doctor2Email = "emily.chen@example.com";
+const doctor2FeePerHour = parseUnits("45", 6); // $45 per hour
+const doctor2IPFSHash = "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
 
+console.log(`  Name: ${doctor2Name}`);
+console.log(`  Specialization: ${doctor2Specialization}`);
+console.log(`  Consultation Fee: ${formatUnits(doctor2FeePerHour, 6)} PYUSD/hour`);
 
-console.log("-----------------------------------\n");
-console.log(` Registration ID: ${registerId}\n`);
+const registerTx2Hash = await doctorRegistryContract.write.registerAsDoctor(
+  [doctor2Name, doctor2Specialization, doctor2Description, doctor2Email, doctor2FeePerHour, doctor2IPFSHash],
+  { account: dermatologist.account }
+);
+
+await publicClient.waitForTransactionReceipt({ hash: registerTx2Hash });
+console.log("✓ Dermatologist registered successfully");
+console.log(`  Transaction: ${registerTx2Hash}`);
+
+// Doctor 3: Neurologist
+console.log("\n--- Registering Doctor 3: Neurologist ---");
+const doctor3Name = "Michael Rodriguez";
+const doctor3Specialization = "Neurologist";
+const doctor3Description = "Expert neurologist focusing on brain and nervous system disorders.";
+const doctor3Email = "michael.rodriguez@example.com";
+const doctor3FeePerHour = parseUnits("60", 6); // $60 per hour
+const doctor3IPFSHash = "0x7890abcdef1234567890abcdef1234567890abcdef1234567890abcdef123456";
+
+console.log(`  Name: ${doctor3Name}`);
+console.log(`  Specialization: ${doctor3Specialization}`);
+console.log(`  Consultation Fee: ${formatUnits(doctor3FeePerHour, 6)} PYUSD/hour`);
+
+const registerTx3Hash = await doctorRegistryContract.write.registerAsDoctor(
+  [doctor3Name, doctor3Specialization, doctor3Description, doctor3Email, doctor3FeePerHour, doctor3IPFSHash],
+  { account: neurologist.account }
+);
+
+await publicClient.waitForTransactionReceipt({ hash: registerTx3Hash });
+console.log("✓ Neurologist registered successfully");
+console.log(`  Transaction: ${registerTx3Hash}`);
+
+// Get doctor IDs
+const cardiologistId = 1;
+const dermatologistId = 2;
+const neurologistId = 3;
+const doctorId = cardiologistId; // Keep this for backwards compatibility with later code
+
+console.log(`\n✓ All doctors registered successfully`);
+console.log(`  Cardiologist ID: ${cardiologistId}`);
+console.log(`  Dermatologist ID: ${dermatologistId}`);
+console.log(`  Neurologist ID: ${neurologistId}\n`);
 
 // ============================================
-// STEP 3: Admin Approves Doctor
+// STEP 3: Admin Approves Doctors
 // ============================================
-console.log("STEP 3: Admin Approves Doctor");
+console.log("STEP 3: Admin Approves Doctors");
 console.log("-----------------------------------");
 
 // Grant APPROVER role to deployer
@@ -199,25 +266,50 @@ await doctorRegistryContract.write.grantRole(
 );
 console.log("✓ APPROVER role granted");
 
-// Approve the doctor
-console.log(`\nApproving Registration ID: ${registerId}...`);
-const approveTxHash = await doctorRegistryContract.write.approveDoctor(
-  [pendingDoctor[0]["doctorAddress"]],
+// Approve all three doctors
+console.log(`\n--- Approving Cardiologist (ID: ${cardiologistId}) ---`);
+const approveTx1Hash = await doctorRegistryContract.write.approveDoctor(
+  [cardiologist.account.address],
   { account: deployer.account }
 );
-await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
-console.log("✓ Doctor approved successfully");
-console.log(`  Transaction: ${approveTxHash}`);
+await publicClient.waitForTransactionReceipt({ hash: approveTx1Hash });
+console.log("✓ Cardiologist approved successfully");
+console.log(`  Transaction: ${approveTx1Hash}`);
 
-const doctorId = await doctorRegistryContract.read.getDoctorID([pendingDoctor[0]["doctorAddress"]]);
+console.log(`\n--- Approving Dermatologist (ID: ${dermatologistId}) ---`);
+const approveTx2Hash = await doctorRegistryContract.write.approveDoctor(
+  [dermatologist.account.address],
+  { account: deployer.account }
+);
+await publicClient.waitForTransactionReceipt({ hash: approveTx2Hash });
+console.log("✓ Dermatologist approved successfully");
+console.log(`  Transaction: ${approveTx2Hash}`);
 
-// Verify doctor is approved
-const approvedDoctor = await doctorRegistryContract.read.getDoctor([doctorId]);
-console.log("\nApproved Doctor Details:");
-console.log(`  Name: ${approvedDoctor.Name}`);
-console.log(`  Specialization: ${approvedDoctor.specialization}`);
-console.log(`  Address: ${approvedDoctor.doctorAddress}`);
-console.log(`  Consultation Fee: ${formatUnits(approvedDoctor.consultationFeePerHour, 6)} PYUSD/hour`);
+console.log(`\n--- Approving Neurologist (ID: ${neurologistId}) ---`);
+const approveTx3Hash = await doctorRegistryContract.write.approveDoctor(
+  [neurologist.account.address],
+  { account: deployer.account }
+);
+await publicClient.waitForTransactionReceipt({ hash: approveTx3Hash });
+console.log("✓ Neurologist approved successfully");
+console.log(`  Transaction: ${approveTx3Hash}`);
+
+// Verify all doctors are approved
+console.log("\n--- Approved Doctors Summary ---");
+const approvedDoctor1 = await doctorRegistryContract.read.getDoctor([cardiologistId]);
+console.log(`Cardiologist - ${approvedDoctor1.Name}:`);
+console.log(`  Specialization: ${approvedDoctor1.specialization}`);
+console.log(`  Fee: ${formatUnits(approvedDoctor1.consultationFeePerHour, 6)} PYUSD/hour`);
+
+const approvedDoctor2 = await doctorRegistryContract.read.getDoctor([dermatologistId]);
+console.log(`\nDermatologist - ${approvedDoctor2.Name}:`);
+console.log(`  Specialization: ${approvedDoctor2.specialization}`);
+console.log(`  Fee: ${formatUnits(approvedDoctor2.consultationFeePerHour, 6)} PYUSD/hour`);
+
+const approvedDoctor3 = await doctorRegistryContract.read.getDoctor([neurologistId]);
+console.log(`\nNeurologist - ${approvedDoctor3.Name}:`);
+console.log(`  Specialization: ${approvedDoctor3.specialization}`);
+console.log(`  Fee: ${formatUnits(approvedDoctor3.consultationFeePerHour, 6)} PYUSD/hour`);
 console.log("-----------------------------------\n");
 
 // ============================================
@@ -255,7 +347,7 @@ console.log("STEP 5: Patient Creates Consultation Session");
 console.log("-----------------------------------");
 
 const consultationPayment = parseUnits("50", 6); // Paying 50 PYUSD
-console.log(`Consultation Fee: ${formatUnits(consultationFeePerHour, 6)} PYUSD`);
+console.log(`Consultation Fee (Cardiologist): ${formatUnits(doctor1FeePerHour, 6)} PYUSD/hour`);
 console.log(`Patient Payment: ${formatUnits(consultationPayment, 6)} PYUSD`);
 
 // Approve escrow to spend PYUSD from patient
@@ -320,10 +412,11 @@ console.log("===========================================");
 console.log("DEMO FLOW COMPLETED SUCCESSFULLY!");
 console.log("===========================================");
 console.log("\nSummary:");
-console.log(`  ✓ Doctor "${doctorName}" registered and approved`);
-console.log(`  ✓ Doctor ID: ${doctorId}`);
-console.log(`  ✓ Consultation Fee: ${formatUnits(consultationFeePerHour, 6)} PYUSD/hour`);
-console.log(`  ✓ Session ID: ${sessionId} created`);
+console.log(`  ✓ 3 Doctors registered and approved:`);
+console.log(`    - ${doctor1Name} (Cardiologist, ID: ${cardiologistId})`);
+console.log(`    - ${doctor2Name} (Dermatologist, ID: ${dermatologistId})`);
+console.log(`    - ${doctor3Name} (Neurologist, ID: ${neurologistId})`);
+console.log(`  ✓ Session ID: ${sessionId} created with Cardiologist`);
 console.log(`  ✓ Patient paid: ${formatUnits(consultationPayment, 6)} PYUSD`);
 console.log(`  ✓ Escrow holds: ${formatUnits(session.pyusdAmount, 6)} PYUSD for doctor`);
 
@@ -334,12 +427,16 @@ console.log("  3. Doctor calls releasePayment() with IPFS hash");
 console.log("  4. Patient can rate the session after completion");
 
 // Final balances
-const finalDoctorBalance = await pyusdContract.read.balanceOf([doctor.account.address]);
+const finalCardiologistBalance = await pyusdContract.read.balanceOf([cardiologist.account.address]);
+const finalNeurologistBalance = await pyusdContract.read.balanceOf([neurologist.account.address]);
+const finalDermatologistBalance = await pyusdContract.read.balanceOf([dermatologist.account.address]);
 const finalPatientBalance = await pyusdContract.read.balanceOf([patient.account.address]);
 const finalEscrowBalance = await pyusdContract.read.balanceOf([consultationEscrowContract.address]);
 
 console.log("\nFinal PYUSD Balances:");
-console.log(`  Doctor: ${formatUnits(finalDoctorBalance as bigint, 6)} PYUSD`);
+console.log(`  Cardiologist: ${formatUnits(finalCardiologistBalance as bigint, 6)} PYUSD`);
+console.log(`  Neurologist: ${formatUnits(finalNeurologistBalance as bigint, 6)} PYUSD`);
+console.log(`  Dermatologist: ${formatUnits(finalDermatologistBalance as bigint, 6)} PYUSD`);
 console.log(`  Patient: ${formatUnits(finalPatientBalance as bigint, 6)} PYUSD`);
 console.log(`  Escrow Contract: ${formatUnits(finalEscrowBalance as bigint, 6)} PYUSD`);
 console.log("===========================================\n");

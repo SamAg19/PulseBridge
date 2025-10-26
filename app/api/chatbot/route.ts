@@ -1,16 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const UAGENT_ADDRESS = 'agent1q2g97humd4d6mgmcg783s2dsncu8hn37r3sgglu6eqa6es07wk3xqlmmy4v';
+// Coordinator agent address
+const COORDINATOR_AGENT_ADDRESS = process.env.NEXT_PUBLIC_COORDINATOR_AGENT_ADDRESS ||
+  'agent1qtp0vky7yjfv4wpnt9gamzy7llmw03pfc2kj54falmjtv46advqv2336tuc';
+
 let clientInstance: any = null;
 
 async function getClient() {
   if (!clientInstance) {
     const UAgentClientModule = await import('uagent-client');
     const UAgentClient = UAgentClientModule.default || UAgentClientModule;
+
     clientInstance = new (UAgentClient as any)({
       timeout: 60000,
       autoStartBridge: true
     });
+
     await new Promise(resolve => setTimeout(resolve, 2000));
   }
   return clientInstance;
@@ -27,10 +32,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const client = await getClient();
-    const result = await client.query(UAGENT_ADDRESS, message);
+    console.log(`[Chatbot API] Sending to coordinator: ${COORDINATOR_AGENT_ADDRESS}`);
+    console.log(`[Chatbot API] Message: ${message.substring(0, 100)}`);
 
-    if (result.success) {
+    const client = await getClient();
+
+    // The uagent-client will wrap this in ChatMessage format (with TextContent)
+    // and send it to our coordinator agent via the bridge
+    const result = await client.query(COORDINATOR_AGENT_ADDRESS, message);
+
+    console.log(`[Chatbot API] Result:`, result);
+
+    // The result object has structure: { success, response?, error?, requestId }
+    if (result && result.success && result.response) {
       return NextResponse.json({
         response: result.response,
         success: true
@@ -39,10 +53,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         response: 'I apologize, but I was unable to process your request at this time.',
         success: false,
-        error: result.error
+        error: result?.error || 'No response from agent'
       });
     }
   } catch (error) {
+    console.error('[Chatbot API] Error:', error);
+
     return NextResponse.json(
       {
         response: 'An error occurred while processing your request.',

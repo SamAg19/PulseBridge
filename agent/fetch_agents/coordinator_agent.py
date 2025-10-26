@@ -445,7 +445,7 @@ try:
         ctx.logger.info(f"Received chat acknowledgement from {sender} for message {msg.acknowledged_msg_id}")
         # No action needed - just log it
 
-    @agent.on_message(model=BridgeChatMessage, replies={BridgeChatMessage})
+    @agent.on_message(model=BridgeChatMessage)
     async def handle_bridge_chat(ctx: Context, sender: str, msg: BridgeChatMessage):
         """
         Handle standard chat protocol messages from uagent-client bridge
@@ -522,16 +522,9 @@ try:
             await ctx.send(sender, error_response)
             return
 
-        # Send processing acknowledgment
-        processing_response = BridgeChatMessage(
-            timestamp=datetime.utcnow(),
-            msg_id=uuid4(),
-            content=[BridgeTextContent(
-                type="text",
-                text="🔍 Analyzing your symptoms with our AI medical specialists. This may take up to 60 seconds..."
-            )]
-        )
-        await ctx.send(sender, processing_response)
+        # DON'T send intermediate processing message - uagent-client returns on first response
+        # The client.query() will wait for the final response
+        ctx.logger.info(f"Session {session_id}: Processing query, will respond when complete...")
 
         # Send to triage agent
         await ctx.send(

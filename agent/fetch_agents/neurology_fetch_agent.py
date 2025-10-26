@@ -44,6 +44,8 @@ agent = Agent(
     seed=AGENT_SEED,
     port=AGENT_PORT,
     endpoint=[f"http://localhost:{AGENT_PORT}/submit"],
+    mailbox=True,
+    publish_manifest=True
 )
 
 # Initialize MeTTa knowledge base

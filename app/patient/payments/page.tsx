@@ -9,6 +9,7 @@ import TokenSelector, { PaymentSecurityInfo } from '@/components/TokenSelector';
 import { useCreateSession, useApproveERC20, useERC20Allowance } from '@/lib/contracts/hooks';
 import { chains } from '@/lib/constants';
 import { Calendar, Clock, User, DollarSign, ArrowLeft } from 'lucide-react';
+import NexusBridgeAndExecutePayment from '@/components/payment/NexusBridgeAndExecutePayment';
 import NexusBridgePayment from '@/components/payment/NexusBridgePayment';
 
 type TokenType = 'PYUSD' | 'ETH' | 'USDC' | 'USDT';
@@ -372,7 +373,7 @@ export default function PatientPayments() {
                         <span className="text-white text-lg">🌉</span>
                       </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900">Nexus Bridge</h3>
+                        <h3 className="font-semibold text-gray-900">Nexus Bridge And Execute</h3>
                         <p className="text-sm text-gray-600">Cross-chain payment</p>
                       </div>
                     </div>
@@ -385,9 +386,9 @@ export default function PatientPayments() {
                     )}
                   </div>
                   <ul className="text-xs text-gray-600 space-y-1 ml-13">
-                    <li>• Bridge from any chain</li>
+                    <li>• Bridge and Execute from any chain</li>
                     <li>• One-click payment</li>
-                    <li>• Supports ETH, USDC, USDT</li>
+                    <li>• Supports USDC, USDT</li>
                   </ul>
                 </div>
               </div>
@@ -403,11 +404,12 @@ export default function PatientPayments() {
                 </div>
               )}
 
-              {paymentMethod === 'nexus' && selectedToken !== 'PYUSD' ? (
-                <NexusBridgePayment
+              {paymentMethod === 'nexus' && selectedToken !== 'PYUSD' && selectedToken !== 'ETH' ? (
+                <NexusBridgeAndExecutePayment
                   doctorId={bookingDetails.doctorId}
                   consultationFee={convertedAmount > 0 ? convertedAmount : bookingDetails.fee}
-                  selectedToken={selectedToken as 'ETH' | 'USDC' | 'USDT'}
+                  selectedToken={selectedToken as 'USDC' | 'USDT'}
+                  priceUpdateData={priceUpdates ? `0x${priceUpdates.binary.data[0]}` : '0x'}
                   startTime={Math.floor(new Date(`${bookingDetails.slotDate}T${bookingDetails.slotStartTime}`).getTime() / 1000)}
                   onSuccess={() => {
                     alert('Session created successfully! Redirecting to your appointments...');
@@ -423,6 +425,12 @@ export default function PatientPayments() {
                     ⚠️ Nexus Bridge payment is not available for PYUSD. Please select ETH or another stablecoin (USDC or USDT) or use Standard Payment method.
                   </p>
                 </div>
+              ) : paymentMethod === 'nexus' && selectedToken === 'ETH' ? (
+                <NexusBridgePayment
+                  chainId={chainId}
+                  selectedToken={selectedToken}
+                  convertedAmount={convertedAmount}
+                />
               ) : null}
 
               {paymentMethod === 'standard' && (

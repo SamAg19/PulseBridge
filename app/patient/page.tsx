@@ -182,13 +182,37 @@ export default function PatientDashboard() {
 
     try {
       // Fetch available time slots from Firebase
+      console.log('Fetching availability for doctor ID:', doctor.doctorId);
       const availability = await getDoctorAvailabilityById(doctor.doctorId);
+      console.log('Fetched availability:', availability);
 
       if (availability && availability.timeSlots) {
-        // Filter only available (non-booked) slots
-        const slots = availability.timeSlots.filter((slot: TimeSlot) => !slot.isBooked);
+        console.log('Total time slots:', availability.timeSlots.length);
+        const now = new Date();
+
+        // Filter only available (non-booked) slots and future slots
+        const slots = availability.timeSlots.filter((slot: TimeSlot) => {
+          if (slot.isBooked) return false;
+
+          // Create datetime from slot date and start time
+          const slotDateTime = new Date(`${slot.date}T${slot.startTime}`);
+
+          // Only show slots that haven't started yet
+          return slotDateTime > now;
+        });
+
+        console.log('Available future slots:', slots.length);
+
+        // Sort slots by date and time (earliest first)
+        slots.sort((a, b) => {
+          const dateA = new Date(`${a.date}T${a.startTime}`);
+          const dateB = new Date(`${b.date}T${b.startTime}`);
+          return dateA.getTime() - dateB.getTime();
+        });
+
         setAvailableSlots(slots);
       } else {
+        console.log('No availability data found for doctor');
         setAvailableSlots([]);
       }
     } catch (error) {
@@ -244,7 +268,7 @@ export default function PatientDashboard() {
       subtitle="Book appointments with verified doctors"
     >
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
         <div className="glass-card rounded-xl p-4 sm:p-6 border border-blue-200">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -270,18 +294,6 @@ export default function PatientDashboard() {
         </div>
 
         <div className="glass-card rounded-xl p-4 sm:p-6 border border-blue-200">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Coins className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
-            </div>
-            <div>
-              <h3 className="text-sm sm:text-base font-semibold text-primary">Starting From</h3>
-              <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-blue-400">50 PYUSD</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="glass-card rounded-xl p-4 sm:p-6 border border-blue-200 sm:col-span-2 lg:col-span-1">
           <h3 className="text-sm sm:text-base font-semibold text-primary mb-3">Quick Access</h3>
           <div className="space-y-2">
             <a href="/patient/appointments" className="flex items-center text-sm text-blue-600 hover:text-blue-800 transition-colors">

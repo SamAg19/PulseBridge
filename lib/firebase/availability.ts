@@ -64,6 +64,7 @@ export const getDoctorAvailability = async (
 
 /**
  * Get doctor availability by on-chain doctor ID
+ * Returns the most recently updated availability if multiple exist
  */
 export const getDoctorAvailabilityById = async (
   doctorId: number
@@ -80,10 +81,23 @@ export const getDoctorAvailabilityById = async (
       return null;
     }
 
-    const doc = querySnapshot.docs[0];
+    // If multiple documents exist for the same doctorId, get the most recently updated one
+    let latestDoc = querySnapshot.docs[0];
+    let latestTimestamp = querySnapshot.docs[0].data().updatedAt;
+
+    for (const doc of querySnapshot.docs) {
+      const docData = doc.data();
+      if (docData.updatedAt && docData.updatedAt > latestTimestamp) {
+        latestDoc = doc;
+        latestTimestamp = docData.updatedAt;
+      }
+    }
+
+    console.log(`Found ${querySnapshot.docs.length} availability records for doctor ${doctorId}, using latest:`, latestDoc.id);
+
     return {
-      id: doc.id,
-      ...doc.data(),
+      id: latestDoc.id,
+      ...latestDoc.data(),
     } as DoctorAvailability;
   } catch (error: any) {
     throw new Error(`Failed to get availability by ID: ${error.message}`);

@@ -199,7 +199,7 @@ export default function DashboardPage() {
       {/* Quick Actions */}
       <div>
         <h2 className="text-xl sm:text-2xl font-bold text-primary mb-4 sm:mb-6">Quick Actions</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           <Link
             href="/dashboard/tasks/create"
             className="glass-card rounded-xl hover:shadow-xl transition-all duration-300 p-6 sm:p-8 text-center transform hover:scale-105 border border-blue-200 group"
@@ -212,8 +212,19 @@ export default function DashboardPage() {
           </Link>
 
           <Link
+            href="/dashboard/slots"
+            className="glass-card rounded-xl hover:shadow-xl transition-all duration-300 p-6 sm:p-8 text-center transform hover:scale-105 border border-green-200 group"
+          >
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-green-200 transition-colors">
+              <Clock className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
+            </div>
+            <h3 className="text-lg sm:text-xl font-bold text-primary mb-2">Manage Slots</h3>
+            <p className="text-secondary text-sm sm:text-base">View and delete your time slots</p>
+          </Link>
+
+          <Link
             href="/dashboard/appointments"
-            className="glass-card rounded-xl hover:shadow-xl transition-all duration-300 p-6 sm:p-8 text-center transform hover:scale-105 border border-blue-200 group"
+            className="glass-card rounded-xl hover:shadow-xl transition-all duration-300 p-6 sm:p-8 text-center transform hover:scale-105 border border-purple-200 group"
           >
             <div className="w-12 h-12 sm:w-16 sm:h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-purple-200 transition-colors">
               <Calendar className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" />

@@ -102,15 +102,24 @@ export default function CreateTaskPage() {
     setError('');
 
     try {
+      console.log('Saving availability for doctor ID:', doctorId);
+      console.log('Wallet address:', address);
+      console.log('New slots to add:', slots.length);
+
       // Get existing availability
       const existingAvailability = await getDoctorAvailability(address);
+      console.log('Existing availability:', existingAvailability);
 
       // Merge new slots with existing ones
       const existingSlots = existingAvailability?.timeSlots || [];
+      console.log('Existing slots count:', existingSlots.length);
+
       const allSlots = [...existingSlots, ...slots];
+      console.log('Total slots after merge:', allSlots.length);
 
       // Save to Firebase availability collection
       await setDoctorAvailability(doctorId, address, allSlots);
+      console.log('Successfully saved to Firebase');
 
       alert(`Successfully added ${slots.length} time slot${slots.length > 1 ? 's' : ''}!`);
       router.push('/dashboard');

@@ -1,4 +1,4 @@
-# PulseBridge Agent Local Deployment Guide
+# PulseBridge Agent Guide
 
 ## System Architecture
 

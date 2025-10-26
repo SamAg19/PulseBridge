@@ -68,6 +68,8 @@ contract DoctorRegistry is AccessControl, IDoctorRegistry {
             "Legal documents IPFS hash is required!"
         );
 
+        require(docToRegistrationID[msg.sender] == 0, "Doctor already registered or pending approval");
+
         numTotalRegistrations++;
 
         PendingRegistry[numTotalRegistrations] = Structs.RegStruct({

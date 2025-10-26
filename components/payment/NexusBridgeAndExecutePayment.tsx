@@ -140,7 +140,7 @@ export default function NexusBridgeAndExecutePayment({
       }
     }
 
-    let tokenAddress: `0x${string}`;    
+    let tokenAddress: `0x${string}`;
     if (selectedToken === 'USDC') {
       tokenAddress = chains[chainId]?.USDC as `0x${string}`;
     } else { // USDT
@@ -158,9 +158,46 @@ export default function NexusBridgeAndExecutePayment({
       setError('');
 
       // Convert fee to proper decimals (6 for stablecoins)
-      const paymentAmount = parseUnits(consultationFee.toString(), 6);
-
+      const paymentAmount = parseUnits(consultationFee.toFixed(6), 6);
       setStatus('executing');
+
+
+      // // Use Nexus SDK bridgeAndExecute
+      // const result2 = await sdk.simulateBridgeAndExecute({
+      //   token: selectedToken as any, // USDC, or USDT
+      //   amount: paymentAmount.toString(),
+      //   toChainId: chainId, // Target chain (Sepolia = 11155111)
+      //   execute: {
+      //     contractAddress: escrowAddress as `0x${string}`,
+      //     contractAbi: ConsultationEscrowABI,
+      //     functionName: 'createSession',
+      //     buildFunctionParams: (token: any, amount: string | number | bigint | boolean, chainId: any, userAddress: any) => {
+      //       const amountBigInt = typeof amount === 'bigint'
+      //         ? amount
+      //         : typeof amount === 'string'
+      //           ? BigInt(amount.split('.')[0]) // Remove any decimals from string
+      //           : BigInt(Math.floor(Number(amount)));
+      //       return {
+      //         functionParams: [
+      //           doctorId,
+      //           amountBigInt,
+      //           [priceUpdateData],
+      //           tokenAddress as `0x${string}`,
+      //           BigInt(startTime),
+      //         ],
+      //       };
+      //     },
+      //     tokenApproval: {
+      //       token: selectedToken as any,
+      //       amount: paymentAmount.toString(),
+      //     },
+      //   },
+      //   waitForReceipt: true,
+      //   requiredConfirmations: 1,
+      // } as any);
+
+
+
 
       // Use Nexus SDK bridgeAndExecute
       const result = await sdk.bridgeAndExecute({
@@ -172,10 +209,15 @@ export default function NexusBridgeAndExecutePayment({
           contractAbi: ConsultationEscrowABI,
           functionName: 'createSession',
           buildFunctionParams: (token: any, amount: string | number | bigint | boolean, chainId: any, userAddress: any) => {
+            const amountBigInt = typeof amount === 'bigint'
+              ? amount
+              : typeof amount === 'string'
+                ? BigInt(amount.split('.')[0]) // Remove any decimals from string
+                : BigInt(Math.floor(Number(amount)));
             return {
               functionParams: [
                 doctorId,
-                BigInt(amount),
+                amountBigInt,
                 [priceUpdateData],
                 tokenAddress as `0x${string}`,
                 BigInt(startTime),
@@ -194,9 +236,11 @@ export default function NexusBridgeAndExecutePayment({
       if (result.success) {
         setTxHash(result.executeTransactionHash || result.bridgeTransactionHash || '');
         setStatus('success');
+        console.log("succes!!", result);
         onSuccess?.();
       } else {
-        throw new Error(result.error || 'Transaction failed');
+        console.log(result)
+        throw new Error('Transaction failed');
       }
     } catch (err: any) {
       console.error('Bridge and execute error:', err);

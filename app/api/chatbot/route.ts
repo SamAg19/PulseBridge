@@ -1,7 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Coordinator agent HTTP endpoint - running on port 8001
-const COORDINATOR_AGENT_URL = process.env.COORDINATOR_AGENT_URL || 'http://localhost:8001';
+// Coordinator agent address
+const COORDINATOR_AGENT_ADDRESS = process.env.NEXT_PUBLIC_COORDINATOR_AGENT_ADDRESS ||
+  'agent1qtp0vky7yjfv4wpnt9gamzy7llmw03pfc2kj54falmjtv46advqv2336tuc';
+
+let clientInstance: any = null;
+
+async function getClient() {
+  if (!clientInstance) {
+    const UAgentClientModule = await import('uagent-client');
+    const UAgentClient = UAgentClientModule.default || UAgentClientModule;
+
+    clientInstance = new (UAgentClient as any)({
+      timeout: 60000,
+      autoStartBridge: true
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+  return clientInstance;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,55 +32,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Prepare the message payload for the coordinator agent
-    // Must match the RestChatRequest model structure
-    const payload = {
-      message: message
-    };
+    console.log(`[Chatbot API] Sending to coordinator: ${COORDINATOR_AGENT_ADDRESS}`);
+    console.log(`[Chatbot API] Message: ${message.substring(0, 100)}`);
 
-    console.log(`[Chatbot API] Sending to coordinator: ${COORDINATOR_AGENT_URL}/chat`);
-    console.log(`[Chatbot API] Message: ${message.substring(0, 100)}...`);
-    console.log(`[Chatbot API] Payload:`, JSON.stringify(payload));
+    const client = await getClient();
 
-    // Make direct HTTP POST request to coordinator agent's REST endpoint
-    const response = await fetch(`${COORDINATOR_AGENT_URL}/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
+    // The uagent-client will wrap this in ChatMessage format (with TextContent)
+    // and send it to our coordinator agent via the bridge
+    const result = await client.query(COORDINATOR_AGENT_ADDRESS, message);
 
-    console.log(`[Chatbot API] Response status: ${response.status}`);
+    console.log(`[Chatbot API] Result:`, result);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[Chatbot API] Agent returned error:`, errorText);
-
+    // The result object has structure: { success, response?, error?, requestId }
+    if (result && result.success && result.response) {
       return NextResponse.json({
-        response: 'I apologize, but I was unable to process your request at this time. Please ensure the coordinator agent is running on port 8001.',
+        response: result.response,
+        success: true
+      });
+    } else {
+      return NextResponse.json({
+        response: 'I apologize, but I was unable to process your request at this time.',
         success: false,
-        error: `HTTP ${response.status}: ${errorText}`
+        error: result?.error || 'No response from agent'
       });
     }
-
-    const data = await response.json();
-    console.log(`[Chatbot API] Received response:`, data);
-
-    // Extract response from the agent's RestChatResponse
-    return NextResponse.json({
-      response: data.response || 'No response from agent',
-      success: true,
-      sessionId: data.session_id,
-      metadata: data.metadata || {}
-    });
-
   } catch (error) {
-    console.error('[Chatbot API] Error processing request:', error);
+    console.error('[Chatbot API] Error:', error);
 
     return NextResponse.json(
       {
-        response: 'An error occurred while processing your request. Please check if the coordinator agent is running on port 8001.',
+        response: 'An error occurred while processing your request.',
         error: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }

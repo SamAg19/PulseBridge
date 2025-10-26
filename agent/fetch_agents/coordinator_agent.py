@@ -20,12 +20,13 @@ from fetch_agents.messages import (
     AgentHealthResponse
 )
 from fetch_agents.web3_doctor_client import get_web3_doctor_client
-from typing import Dict
+from typing import Dict, List, Any
 import os
 from dotenv import load_dotenv
 import logging
 from datetime import datetime
 import asyncio
+from uuid import UUID, uuid4
 
 # Load environment variables
 load_dotenv()
@@ -255,8 +256,34 @@ async def handle_specialist_response(ctx: Context, sender: str, msg: SpecialistA
         }
     )
 
-    # Check if this is REST mode (synchronous) or message mode (asynchronous)
-    if active_sessions[session_id].get("rest_mode"):
+    # Check if this is bridge mode (uagent-client), REST mode, or message mode
+    if active_sessions[session_id].get("bridge_mode"):
+        # BRIDGE MODE: Send response in ChatMessage format for uagent-client
+        user = active_sessions[session_id]["user"]
+        ctx.logger.info(f"Session {session_id}: Bridge mode - sending ChatMessage response")
+
+        try:
+            from uagents_core.contrib.protocols.chat import (
+                ChatMessage as BridgeChatMessage,
+                TextContent as BridgeTextContent
+            )
+            from uuid import uuid4
+            from datetime import datetime
+
+            response = BridgeChatMessage(
+                timestamp=datetime.utcnow(),
+                msg_id=uuid4(),
+                content=[BridgeTextContent(type="text", text=formatted_response)]
+            )
+            await ctx.send(user, response)
+            ctx.logger.info(f"Session {session_id}: Complete response sent to bridge client")
+        except ImportError:
+            ctx.logger.error("Bridge chat protocol not available!")
+
+        # Cleanup session
+        del active_sessions[session_id]
+
+    elif active_sessions[session_id].get("rest_mode"):
         # REST MODE: Store response for REST handler to return
         ctx.logger.info(f"Session {session_id}: REST mode - storing response")
         active_sessions[session_id]["final_response"] = chat_response
@@ -400,45 +427,175 @@ async def handle_health_check(ctx: Context, sender: str, msg: AgentHealthCheck):
 agent.include(health_protocol, publish_manifest=True)
 
 
-# REST ENDPOINT (Web Integration)
+# STANDARD CHAT PROTOCOL (for uagent-client bridge compatibility)
 
-# Define request/response models for REST endpoint
-class RestChatRequest(Model):
-    """REST API request for web frontend"""
+# Try to import the standard chat protocol from uagents
+try:
+    from uagents_core.contrib.protocols.chat import (
+        ChatMessage as BridgeChatMessage,
+        TextContent as BridgeTextContent,
+        ChatAcknowledgement
+    )
+    STANDARD_CHAT_AVAILABLE = True
+    logger.info("✓ Standard chat protocol imported from uagents_core")
+
+    @agent.on_message(model=ChatAcknowledgement)
+    async def handle_chat_acknowledgement(ctx: Context, sender: str, msg: ChatAcknowledgement):
+        """Handle acknowledgements from the bridge or other agents"""
+        ctx.logger.info(f"Received chat acknowledgement from {sender} for message {msg.acknowledged_msg_id}")
+        # No action needed - just log it
+
+    @agent.on_message(model=BridgeChatMessage, replies={BridgeChatMessage})
+    async def handle_bridge_chat(ctx: Context, sender: str, msg: BridgeChatMessage):
+        """
+        Handle standard chat protocol messages from uagent-client bridge
+        Uses the official uagents chat protocol for compatibility.
+
+        This handler processes messages from the uagent-client library and
+        orchestrates the full multi-agent medical consultation workflow.
+        """
+        ctx.logger.info(f"Received bridge chat message from {sender}")
+        ctx.logger.info(f"Message ID: {msg.msg_id}, Timestamp: {msg.timestamp}")
+
+        # Extract text from content list
+        message_text = ""
+        for item in msg.content:
+            if hasattr(item, 'text'):
+                message_text = item.text
+                break
+
+        if not message_text:
+            ctx.logger.warning("No text content found in bridge chat message")
+            error_response = BridgeChatMessage(
+                timestamp=datetime.utcnow(),
+                msg_id=uuid4(),
+                content=[BridgeTextContent(type="text", text="❌ No text content received in message")]
+            )
+            await ctx.send(sender, error_response)
+            return
+
+        ctx.logger.info(f"Extracted text: {message_text[:100]}...")
+
+        # Send acknowledgement
+        await ctx.send(sender, ChatAcknowledgement(
+            timestamp=datetime.utcnow(),
+            acknowledged_msg_id=msg.msg_id
+        ))
+
+        # Handle greeting
+        if _is_greeting(message_text):
+            response_text = _get_welcome_message()
+            response = BridgeChatMessage(
+                timestamp=datetime.utcnow(),
+                msg_id=uuid4(),
+                content=[BridgeTextContent(type="text", text=response_text)]
+            )
+            await ctx.send(sender, response)
+            return
+
+        # FULL MULTI-AGENT WORKFLOW
+        # Generate session ID
+        session_id = f"bridge-{datetime.now().timestamp()}"
+
+        # Create session for async workflow - store sender for response
+        active_sessions[session_id] = {
+            "user": sender,
+            "symptoms": message_text,
+            "timestamp": datetime.now().isoformat(),
+            "triage_response": None,
+            "specialist_response": None,
+            "bridge_mode": True,  # Flag to indicate this is from uagent-client bridge
+            "response_ready": False,
+            "final_response": None
+        }
+
+        ctx.logger.info(f"Session {session_id}: Starting multi-agent consultation (bridge mode)")
+
+        # Check if triage agent is configured
+        if not TRIAGE_AGENT_ADDRESS:
+            error_text = "⚠️ System configuration error: Triage agent not available. Please contact support."
+            error_response = BridgeChatMessage(
+                timestamp=datetime.utcnow(),
+                msg_id=uuid4(),
+                content=[BridgeTextContent(type="text", text=error_text)]
+            )
+            await ctx.send(sender, error_response)
+            return
+
+        # Send processing acknowledgment
+        processing_response = BridgeChatMessage(
+            timestamp=datetime.utcnow(),
+            msg_id=uuid4(),
+            content=[BridgeTextContent(
+                type="text",
+                text="🔍 Analyzing your symptoms with our AI medical specialists. This may take up to 60 seconds..."
+            )]
+        )
+        await ctx.send(sender, processing_response)
+
+        # Send to triage agent
+        await ctx.send(
+            TRIAGE_AGENT_ADDRESS,
+            SymptomRoutingRequest(
+                symptoms=message_text,
+                patient_age=None,
+                patient_gender=None,
+                medical_history=[],
+                session_id=session_id
+            )
+        )
+
+        # DON'T WAIT HERE - Let the handler return so the agent can process incoming messages
+        # The response will be sent by handle_specialist_response when the workflow completes
+        ctx.logger.info(f"Session {session_id}: Triage request sent, waiting for async response...")
+
+except ImportError as e:
+    logger.warning(f"⚠ Standard chat protocol not available: {e}")
+    STANDARD_CHAT_AVAILABLE = False
+
+
+# WEB QUERY HANDLER (uagent-client Integration)
+
+# Simple string message model for uagent-client queries
+class WebQuery(Model):
+    """Query model for uagent-client integration"""
     message: str
 
-class RestChatResponse(Model):
-    """REST API response for web frontend"""
+class WebQueryResponse(Model):
+    """Response model for uagent-client queries"""
     response: str
-    session_id: str
-    metadata: Dict = {}
+    success: bool = True
 
-# Add REST endpoint for web frontend integration
-@agent.on_rest_post("/chat", RestChatRequest, RestChatResponse)
-async def handle_rest_chat(ctx: Context, req: RestChatRequest) -> RestChatResponse:
+# Message handler for uagent-client.query() calls via mailbox
+@agent.on_message(model=WebQuery)
+async def handle_web_query(ctx: Context, sender: str, msg: WebQuery):
     """
-    REST endpoint for web frontend via uagent-client
+    Message handler for uagent-client.query() integration via mailbox
 
-    This provides a synchronous interface that waits for the async
-    multi-agent workflow to complete before returning.
+    Receives a simple string query from the frontend and returns the diagnosis.
+    Works from anywhere via agent mailbox - no need for local HTTP access.
     """
-    ctx.logger.info(f"Received REST chat request: {req.message[:50]}...")
+    message = msg.message
+    ctx.logger.info(f"Received web query from {sender}: {message[:50]}...")
 
     # Generate session ID
     session_id = f"web-{datetime.now().timestamp()}"
 
     # Check for greeting
-    if _is_greeting(req.message):
-        return RestChatResponse(
-            response=_get_welcome_message(),
-            session_id=session_id,
-            metadata={"type": "greeting"}
+    if _is_greeting(message):
+        await ctx.send(
+            sender,
+            WebQueryResponse(
+                response=_get_welcome_message(),
+                success=True
+            )
         )
+        return
 
     # Create session for async workflow
     active_sessions[session_id] = {
-        "user": "web-frontend",
-        "symptoms": req.message,
+        "user": sender,
+        "symptoms": message,
         "timestamp": datetime.now().isoformat(),
         "triage_response": None,
         "specialist_response": None,
@@ -447,21 +604,24 @@ async def handle_rest_chat(ctx: Context, req: RestChatRequest) -> RestChatRespon
         "final_response": None
     }
 
-    ctx.logger.info(f"Session {session_id}: Starting multi-agent consultation (REST MODE)")
+    ctx.logger.info(f"Session {session_id}: Starting multi-agent consultation")
 
     # Check if triage agent is configured
     if not TRIAGE_AGENT_ADDRESS:
-        return RestChatResponse(
-            response="⚠️ System configuration error: Triage agent not available. Please contact support.",
-            session_id=session_id,
-            metadata={"type": "error", "error": "triage_not_configured"}
+        await ctx.send(
+            sender,
+            WebQueryResponse(
+                response="⚠️ System configuration error: Triage agent not available. Please contact support.",
+                success=False
+            )
         )
+        return
 
     # Send to triage agent
     await ctx.send(
         TRIAGE_AGENT_ADDRESS,
         SymptomRoutingRequest(
-            symptoms=req.message,
+            symptoms=message,
             patient_age=None,
             patient_gender=None,
             medical_history=[],
@@ -482,22 +642,27 @@ async def handle_rest_chat(ctx: Context, req: RestChatRequest) -> RestChatRespon
             final_response = active_sessions[session_id]["final_response"]
             # Clean up session
             del active_sessions[session_id]
-            ctx.logger.info(f"Session {session_id}: Returning REST response")
-            return RestChatResponse(
-                response=final_response.response,
-                session_id=final_response.session_id,
-                metadata=final_response.metadata
+            ctx.logger.info(f"Session {session_id}: Sending response back to {sender}")
+            await ctx.send(
+                sender,
+                WebQueryResponse(
+                    response=final_response.response,
+                    success=True
+                )
             )
+            return
 
     # Timeout
-    ctx.logger.warning(f"Session {session_id}: REST request timeout after {max_wait}s")
+    ctx.logger.warning(f"Session {session_id}: Query timeout after {max_wait}s")
     if session_id in active_sessions:
         del active_sessions[session_id]
 
-    return RestChatResponse(
-        response="⏳ Sorry, the analysis is taking longer than expected. Please try again in a moment.",
-        session_id=session_id,
-        metadata={"type": "timeout", "error": "agent_timeout"}
+    await ctx.send(
+        sender,
+        WebQueryResponse(
+            response="⏳ Sorry, the analysis is taking longer than expected. Please try again in a moment.",
+            success=False
+        )
     )
 
 
@@ -543,7 +708,29 @@ async def heartbeat(ctx: Context):
     ctx.logger.info(f"Coordinator Agent: Active ({len(active_sessions)} active sessions)")
 
 
-# ==================== RUN AGENT ====================
+@agent.on_interval(period=120.0)  # Every 2 minutes
+async def cleanup_stale_sessions(ctx: Context):
+    """Clean up sessions that have timed out"""
+    from datetime import datetime, timedelta
+
+    current_time = datetime.now()
+    timeout_threshold = timedelta(minutes=5)  # 5 minute timeout
+
+    stale_sessions = []
+    for session_id, session_data in active_sessions.items():
+        session_time = datetime.fromisoformat(session_data["timestamp"])
+        if current_time - session_time > timeout_threshold:
+            stale_sessions.append(session_id)
+
+    for session_id in stale_sessions:
+        ctx.logger.warning(f"Cleaning up stale session: {session_id}")
+        del active_sessions[session_id]
+
+    if stale_sessions:
+        ctx.logger.info(f"Cleaned up {len(stale_sessions)} stale session(s)")
+
+
+# RUN AGENT
 
 if __name__ == "__main__":
     logger.info("Starting Coordinator Agent (User-Facing)...")

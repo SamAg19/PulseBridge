@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Key } from 'react';
 import { useAccount } from 'wagmi';
 import { DoctorProfile, Task, TimeSlot } from '@/lib/types';
 import { createAppointment, getPatientProfile } from '@/lib/firebase/firestore';
 
 interface BookingModalProps {
-  doctor: DoctorProfile;
-  task: Task;
+  doctor: any;
+  task: any;
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
@@ -126,7 +126,7 @@ export default function BookingModal({ doctor, task, isOpen, onClose, onSuccess 
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Select Time Slot</h3>
             <div className="space-y-4">
-              {task.dateTimeSlots.map((slot, index) => (
+              {task.dateTimeSlots.map((slot: TimeSlot, index: Key | null | undefined) => (
                 <div
                   key={index}
                   onClick={() => handleSlotSelect(slot)}

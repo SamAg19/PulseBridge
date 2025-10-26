@@ -6,7 +6,7 @@ import { useAccount } from 'wagmi';
 import { DoctorWithTasks, Task, TimeSlot } from '@/lib/types';
 
 interface DoctorModalProps {
-  doctor: DoctorWithTasks;
+  doctor: any;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -210,7 +210,7 @@ export default function DoctorModal({ doctor, isOpen, onClose }: DoctorModalProp
             <div className="mb-8">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Available Services</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {doctor.tasks.map((task) => (
+                {doctor.tasks.map((task: any) => (
                   <div key={task.id} className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center space-x-3">
@@ -251,7 +251,7 @@ export default function DoctorModal({ doctor, isOpen, onClose }: DoctorModalProp
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Patient Reviews</h3>
                 <div className="space-y-4">
-                  {doctor.reviews.slice(0, 3).map((review) => (
+                  {doctor.reviews.slice(0, 3).map((review: any) => (
                     <div key={review.id} className="bg-gray-50 rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center space-x-1">

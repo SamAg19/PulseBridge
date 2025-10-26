@@ -5,7 +5,7 @@ import { DoctorWithTasks } from '@/lib/types';
 import DoctorModal from '@/components/DoctorModal';
 
 interface DoctorCardProps {
-  doctor: DoctorWithTasks;
+  doctor: any;
 }
 
 export default function DoctorCard({ doctor }: DoctorCardProps) {
@@ -59,7 +59,7 @@ export default function DoctorCard({ doctor }: DoctorCardProps) {
   };
 
   const lowestFee = doctor.tasks.length > 0 
-    ? Math.min(...doctor.tasks.map(task => task.fee))
+    ? Math.min(...doctor.tasks.map((task: any) => task.fee))
     : 0;
 
   return (
@@ -137,7 +137,7 @@ export default function DoctorCard({ doctor }: DoctorCardProps) {
           <div className="mb-4">
             <h4 className="text-sm font-medium text-primary mb-2">Available Services</h4>
             <div className="flex flex-wrap gap-1">
-              {doctor.tasks.slice(0, 2).map((task, index) => (
+              {doctor.tasks.slice(0, 2).map((task: any, index: number) => (
                 <span 
                   key={index}
                   className="inline-block px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded-full"

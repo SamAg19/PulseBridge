@@ -7,7 +7,6 @@ import { DoctorProfile, Task, TimeSlot } from '@/lib/types';
 import { getDoctorProfile, getTaskById, createAppointment, getPatientProfile } from '@/lib/firebase/firestore';
 import BookingSteps from '@/components/booking/BookingSteps';
 import TimeSlotSelector from '@/components/booking/TimeSlotSelector';
-import PaymentSection from '@/components/booking/PaymentSection';
 import AppointmentSummary from '@/components/booking/AppointmentSummary';
 
 export default function BookingPage() {
@@ -15,10 +14,10 @@ export default function BookingPage() {
   const router = useRouter();
   const { address } = useAccount();
   
-  const [doctor, setDoctor] = useState<DoctorProfile | null>(null);
-  const [task, setTask] = useState<Task | null>(null);
+  const [doctor, setDoctor] = useState<any>(null);
+  const [task, setTask] = useState<any>(null);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
-  const [currentStep, setCurrentStep] = useState<'select' | 'confirm' | 'payment' | 'success'>('select');
+  const [currentStep, setCurrentStep] = useState<'select' | 'confirm' | 'success'>('select');
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [appointmentId, setAppointmentId] = useState<string | null>(null);
@@ -46,8 +45,8 @@ export default function BookingPage() {
           return;
         }
 
-        setDoctor(doctorData as DoctorProfile);
-        setTask(taskData as Task);
+        setDoctor(doctorData as any);
+        setTask(taskData as any);
       } catch (err) {
         console.error('Error loading booking data:', err);
         setError('Failed to load booking information');
@@ -92,7 +91,8 @@ export default function BookingPage() {
       
       if (result.success) {
         setAppointmentId(result.appointmentId);
-        setCurrentStep('payment');
+        // Redirect to payments page to complete payment
+        router.push('/patient/payments');
       } else {
         setError('Failed to create appointment');
       }
@@ -104,30 +104,11 @@ export default function BookingPage() {
     }
   };
 
-  const handlePayment = async () => {
-    try {
-      setIsProcessing(true);
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setCurrentStep('success');
-    } catch (error) {
-      console.error('Payment error:', error);
-      setError('Payment failed. Please try again.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+
 
   const handleBackStep = () => {
-    switch (currentStep) {
-      case 'confirm':
-        setCurrentStep('select');
-        break;
-      case 'payment':
-        setCurrentStep('confirm');
-        break;
-      default:
-        break;
+    if (currentStep === 'confirm') {
+      setCurrentStep('select');
     }
   };
 
@@ -196,7 +177,7 @@ export default function BookingPage() {
               <div className="flex items-center">
                 <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-3">
                   <span className="text-blue-600 font-semibold text-lg">
-                    {doctor.fullName.split(' ').map(n => n[0]).join('')}
+                    {doctor.fullName.split(' ').map((n: string) => n[0]).join('')}
                   </span>
                 </div>
                 <div>
@@ -238,15 +219,6 @@ export default function BookingPage() {
                   selectedSlot={selectedSlot}
                   onBack={handleBackStep}
                   onConfirm={handleConfirmBooking}
-                  isProcessing={isProcessing}
-                />
-              )}
-
-              {currentStep === 'payment' && (
-                <PaymentSection
-                  task={task}
-                  appointmentId={appointmentId}
-                  onPayment={handlePayment}
                   isProcessing={isProcessing}
                 />
               )}

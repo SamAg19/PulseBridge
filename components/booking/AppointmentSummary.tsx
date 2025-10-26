@@ -3,8 +3,8 @@
 import { DoctorProfile, Task, TimeSlot } from '@/lib/types';
 
 interface AppointmentSummaryProps {
-  doctor: DoctorProfile;
-  task: Task;
+  doctor: any;
+  task: any;
   selectedSlot: TimeSlot;
   onBack: () => void;
   onConfirm: () => void;
@@ -79,7 +79,7 @@ export default function AppointmentSummary({
               <div className="flex items-center mb-4">
                 <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mr-4">
                   <span className="text-blue-600 font-bold text-xl">
-                    {doctor.fullName.split(' ').map(n => n[0]).join('')}
+                    {doctor.fullName.split(' ').map((n: string) => n[0]).join('')}
                   </span>
                 </div>
                 <div>

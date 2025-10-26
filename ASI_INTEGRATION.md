@@ -22,6 +22,7 @@
 ### Backend Files
 | Component | Purpose | GitHub Link |
 |-----------|---------|-------------|
+| Agent Description | Overview of agent architecture | [agent/AGENT_DESCRIPTION.md](https://github.com/SamAg19/PulseBridge/blob/main/agent/AGENT_DESCRIPTION.md) |
 | Python Dependencies | UAgents & Web3 packages | [agent/requirements.txt](https://github.com/SamAg19/PulseBridge/blob/main/agent/requirements.txt) |
 | Local Test Agent | UAgent implementation | [agent/test_local.py](https://github.com/SamAg19/PulseBridge/blob/main/agent/test_local.py) |
 | Agent Implementations | Core agent logic | [agent/agents/](https://github.com/SamAg19/PulseBridge/tree/main/agent/agents) |

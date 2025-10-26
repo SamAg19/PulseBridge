@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
         success: true
       });
     } else {
+      console.log(result);
       return NextResponse.json({
         response: 'I apologize, but I was unable to process your request at this time.',
         success: false,

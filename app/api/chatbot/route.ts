@@ -1,20 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const UAGENT_ADDRESS = 'agent1q2g97humd4d6mgmcg783s2dsncu8hn37r3sgglu6eqa6es07wk3xqlmmy4v';
-let clientInstance: any = null;
-
-async function getClient() {
-  if (!clientInstance) {
-    const UAgentClientModule = await import('uagent-client');
-    const UAgentClient = UAgentClientModule.default || UAgentClientModule;
-    clientInstance = new (UAgentClient as any)({
-      timeout: 60000,
-      autoStartBridge: true
-    });
-    await new Promise(resolve => setTimeout(resolve, 2000));
-  }
-  return clientInstance;
-}
+// Coordinator agent HTTP endpoint - running on port 8001
+const COORDINATOR_AGENT_URL = process.env.COORDINATOR_AGENT_URL || 'http://localhost:8001';
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,25 +14,55 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const client = await getClient();
-    const result = await client.query(UAGENT_ADDRESS, message);
+    // Prepare the message payload for the coordinator agent
+    // Must match the RestChatRequest model structure
+    const payload = {
+      message: message
+    };
 
-    if (result.success) {
+    console.log(`[Chatbot API] Sending to coordinator: ${COORDINATOR_AGENT_URL}/chat`);
+    console.log(`[Chatbot API] Message: ${message.substring(0, 100)}...`);
+    console.log(`[Chatbot API] Payload:`, JSON.stringify(payload));
+
+    // Make direct HTTP POST request to coordinator agent's REST endpoint
+    const response = await fetch(`${COORDINATOR_AGENT_URL}/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    console.log(`[Chatbot API] Response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Chatbot API] Agent returned error:`, errorText);
+
       return NextResponse.json({
-        response: result.response,
-        success: true
-      });
-    } else {
-      return NextResponse.json({
-        response: 'I apologize, but I was unable to process your request at this time.',
+        response: 'I apologize, but I was unable to process your request at this time. Please ensure the coordinator agent is running on port 8001.',
         success: false,
-        error: result.error
+        error: `HTTP ${response.status}: ${errorText}`
       });
     }
+
+    const data = await response.json();
+    console.log(`[Chatbot API] Received response:`, data);
+
+    // Extract response from the agent's RestChatResponse
+    return NextResponse.json({
+      response: data.response || 'No response from agent',
+      success: true,
+      sessionId: data.session_id,
+      metadata: data.metadata || {}
+    });
+
   } catch (error) {
+    console.error('[Chatbot API] Error processing request:', error);
+
     return NextResponse.json(
       {
-        response: 'An error occurred while processing your request.',
+        response: 'An error occurred while processing your request. Please check if the coordinator agent is running on port 8001.',
         error: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
